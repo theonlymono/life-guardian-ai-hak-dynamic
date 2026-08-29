@@ -15,7 +15,36 @@ const input = $input.first().json;
 const staticData = $getWorkflowStaticData('global');
 if (!staticData.users) staticData.users = {};
 const existing = staticData.users[input.userId] || { userId: input.userId, profile: {}, conversationContext: {} };
-const extractionPrompt = 'Extract ONLY stated facts from: ' + input.message + '. Context: ' + JSON.stringify(existing) + '. Return JSON with intent, lifeEvents, userProfile, missingInformation, whatIfParams.';
+const extractionPrompt = \`Analyze this life planning message and extract structured facts ONLY from what is stated or clearly implied. Never invent numbers or facts.
+
+User message: "\${input.message}"
+Locale: \${input.locale}
+Currency: \${input.currency}
+Previous profile: \${JSON.stringify(existing.profile || {})}
+Previous conversation context: \${JSON.stringify(existing.conversationContext || {})}
+
+Return JSON with this exact structure and these exact key names:
+{
+  "intent": "new_life_event|follow_up|what_if|general_assessment|provide_information",
+  "lifeEvents": [{"type": "job_loss|job_change|income_decrease|new_job|career_change|marriage|divorce|new_baby|dependent_added|dependent_removed|aging_parent|parent_care|healthcare_concern|long_term_care|child_university|education_funding|buying_house|mortgage|moving|major_purchase|approaching_retirement|retirement_planning|debt_increase|savings_concern|income_instability|general", "confidence": 0.0, "details": {}}],
+  "userProfile": {"age": null, "income": null, "monthlyIncome": null, "monthlyEssentialExpenses": null, "dependents": null, "spouseWorking": null, "mortgage": null, "savings": null, "debt": null, "currentAge": null, "retirementAge": null, "currentSavings": null, "targetSavings": null, "educationSavings": null, "educationTarget": null, "yearsToUniversity": null, "monthlyContribution": null, "parents": []},
+  "financialGoals": [],
+  "timeHorizon": [],
+  "concerns": [],
+  "missingInformation": [],
+  "whatIfParams": {"monthlyContribution": null, "retirementAge": null}
+}
+
+Rules:
+- Every entry in lifeEvents MUST include a "type" chosen from the list above. Never omit it and never invent a new type.
+- Use ONLY the userProfile key names listed above. Do not rename or add keys.
+- dependents counts children and financially supported people. Do not count a non-working spouse; that is spouseWorking. Do not count an aging parent unless the user says they already support them.
+- mortgage is the outstanding amount as a plain number when stated, otherwise null.
+- A child starting university is child_university. A parent who may need care is aging_parent.
+- Put unknown but important values in missingInformation and leave them null in userProfile.
+- Detect intent from the message type. For what-if messages extract monthlyContribution when mentioned.
+- Merge with previous context when the user provides follow-up numbers.\`;
+
 return [{ json: { ...input, userState: existing, extractionPrompt } }];
 `;
 
@@ -63,22 +92,46 @@ const scoreRisk = cat => {
   return { category: cat, priorityScore: urgency*0.35 + impact*0.35 + timeSensitivity*0.2 + dependency*0.1 };
 };
 const priorities = [...new Set(riskMap.map(r => r.category))].map(scoreRisk).sort((a,b) => b.priorityScore - a.priorityScore).slice(0,3).map((s,i) => ({ rank: i+1, category: s.category, reason: 'Priority life risk area', priorityScore: Math.round(s.priorityScore*100) }));
+// Simulations run only on figures the user actually gave us. Never fill a gap with a default amount.
 let simulation = null;
-const monthlyContrib = profile.monthlyContribution || ctx.monthlyContribution || extraction.whatIfParams?.monthlyContribution;
-if (has('job_loss') && profile.savings && profile.monthlyEssentialExpenses) {
-  simulation = { scenario: 'cash_flow', savings: profile.savings, monthlyEssentialExpenses: profile.monthlyEssentialExpenses, emergencyRunwayMonths: Math.floor(profile.savings / profile.monthlyEssentialExpenses), disclaimers: ['Estimates only'] };
+const simulationBlockedBy = [];
+const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
+const monthlyContrib = num(profile.monthlyContribution) ?? num(ctx.monthlyContribution) ?? num(extraction.whatIfParams?.monthlyContribution) ?? 0;
+if (has('job_loss')) {
+  const savings = num(profile.savings), expenses = num(profile.monthlyEssentialExpenses);
+  if (savings !== null && expenses !== null && expenses > 0) {
+    simulation = { scenario: 'cash_flow', savings, monthlyEssentialExpenses: expenses, emergencyRunwayMonths: Math.floor(savings / expenses), disclaimers: ['Estimates only'] };
+  } else {
+    if (savings === null) simulationBlockedBy.push('current savings');
+    if (expenses === null) simulationBlockedBy.push('monthly essential expenses');
+  }
 }
 if (has('child_university') || has('education_funding')) {
-  const current = profile.educationSavings || 1500000, target = profile.educationTarget || 3000000, years = profile.yearsToUniversity || 3, monthly = monthlyContrib || 0;
-  simulation = { scenario: 'education', currentSavings: current, target, years, monthlyContribution: monthly, projectedAmount: current + monthly*12*years, gap: Math.max(0, target - (current + monthly*12*years)), disclaimers: ['Estimates only'] };
+  const current = num(profile.educationSavings), target = num(profile.educationTarget), years = num(profile.yearsToUniversity);
+  if (current !== null && target !== null && years !== null) {
+    const projectedAmount = current + monthlyContrib*12*years;
+    simulation = { scenario: 'education', currentSavings: current, target, years, monthlyContribution: monthlyContrib, projectedAmount, gap: Math.max(0, target - projectedAmount), disclaimers: ['Estimates only'] };
+  } else {
+    if (current === null) simulationBlockedBy.push('how much is already saved for education');
+    if (target === null) simulationBlockedBy.push('your education savings target');
+    if (years === null) simulationBlockedBy.push('years until university starts');
+  }
 }
 if (has('retirement_planning')) {
-  const age = profile.currentAge || profile.age || 55, ret = profile.retirementAge || 60, current = profile.currentSavings || profile.savings || 0, target = profile.targetSavings || 35000000, years = Math.max(0, ret-age);
-  simulation = { scenario: 'retirement', currentAge: age, retirementAge: ret, currentSavings: current, targetSavings: target, scenarios: [
-    { name: 'Save 100K/month', monthlySaving: 100000, projectedSavings: current + 100000*12*years, gap: Math.max(0, target-(current+100000*12*years)) },
-    { name: 'Save 150K/month', monthlySaving: 150000, projectedSavings: current + 150000*12*years, gap: Math.max(0, target-(current+150000*12*years)) },
-    { name: 'Retire at 63', retirementAge: 63, projectedSavings: current + 100000*12*Math.max(0,63-age), gap: Math.max(0, target-(current+100000*12*Math.max(0,63-age))) }
-  ], disclaimers: ['Estimates only'] };
+  const age = num(profile.currentAge) ?? num(profile.age), ret = num(profile.retirementAge), current = num(profile.currentSavings) ?? num(profile.savings), target = num(profile.targetSavings);
+  if (age !== null && ret !== null && current !== null && target !== null) {
+    const years = Math.max(0, ret - age);
+    simulation = { scenario: 'retirement', currentAge: age, retirementAge: ret, currentSavings: current, targetSavings: target, scenarios: [
+      { name: 'Save 100K/month', monthlySaving: 100000, projectedSavings: current + 100000*12*years, gap: Math.max(0, target-(current+100000*12*years)) },
+      { name: 'Save 150K/month', monthlySaving: 150000, projectedSavings: current + 150000*12*years, gap: Math.max(0, target-(current+150000*12*years)) },
+      { name: 'Retire at 63', retirementAge: 63, projectedSavings: current + 100000*12*Math.max(0,63-age), gap: Math.max(0, target-(current+100000*12*Math.max(0,63-age))) }
+    ], disclaimers: ['Estimates only'] };
+  } else {
+    if (age === null) simulationBlockedBy.push('your current age');
+    if (ret === null) simulationBlockedBy.push('your planned retirement age');
+    if (current === null) simulationBlockedBy.push('your current retirement savings');
+    if (target === null) simulationBlockedBy.push('your retirement savings target');
+  }
 }
 let followUp = { required: false, days: 30, reason: 'Check-in' }, protectionReview = null;
 let next7 = ['Focus on top priority first'], next30 = ['Review progress in 30 days'], next3y = [];
@@ -87,8 +140,8 @@ if (has('new_baby')) { followUp = { required: true, days: 90, reason: 'Family pr
 if (has('child_university')) { followUp = { required: true, days: 30, reason: 'Education savings check', message: 'Revisit education target?' }; next7 = ['Confirm savings target','Calculate monthly need','Review timeline']; }
 if (has('aging_parent')) { followUp = { required: true, days: 30, reason: 'Care planning check', message: 'Discussed care plan?' }; next7 = ['Discuss care preferences','Review parent health','Estimate care costs']; }
 const actionPlan = { next7Days: next7, next30Days: next30, next3Years: next3y };
-const conversationPrompt = 'User: ' + prev.message + '. Intent: ' + extraction.intent + '. Priorities: ' + JSON.stringify(priorities) + '. Risks: ' + JSON.stringify(riskMap) + '. Simulation: ' + JSON.stringify(simulation) + '. Write empathetic JSON response with message and voiceScript. Say user does not need to solve everything today if multiple risks.';
-return [{ json: { ...prev, extraction, profile, conversationContext: ctx, aiError, riskMap, priorities, simulation, actionPlan, followUp, protectionReview, conversationPrompt } }];
+const conversationPrompt = 'User: ' + prev.message + '. Intent: ' + extraction.intent + '. Priorities: ' + JSON.stringify(priorities) + '. Risks: ' + JSON.stringify(riskMap) + '. Simulation: ' + JSON.stringify(simulation) + '. Write empathetic JSON response with message and voiceScript. Never state or imply any amount that is not in the data above. Say user does not need to solve everything today if multiple risks.';
+return [{ json: { ...prev, extraction, profile, conversationContext: ctx, aiError, riskMap, priorities, simulation, simulationBlockedBy, actionPlan, followUp, protectionReview, conversationPrompt } }];
 `;
 
 const finalizeJs = `
@@ -104,16 +157,17 @@ try {
   message = 'You do not need to solve everything today. Let us start with your most time-sensitive priority.';
   voiceScript = message;
 }
+const missingInformation = [...new Set([...(d.extraction?.missingInformation || []), ...(d.simulationBlockedBy || [])])];
 const response = {
   success: true,
   conversation: { message, tone: 'supportive', voiceScript },
-  lifeEvents: (d.extraction?.lifeEvents || []).map(e => ({ type: e.type, confidence: e.confidence || 0.8, details: e.details || {} })),
+  lifeEvents: (d.extraction?.lifeEvents || []).map(e => ({ type: e.type || 'general', confidence: e.confidence || 0.8, details: e.details || {} })),
   profile: d.profile || {},
   riskMap: d.riskMap || [],
   priorities: d.priorities || [],
   actionPlan: d.actionPlan || { next7Days: [], next30Days: [], next3Years: [] },
   simulation: d.simulation || null,
-  missingInformation: d.extraction?.missingInformation || [],
+  missingInformation,
   followUp: d.followUp || null,
   protectionReview: d.protectionReview || null,
   conversationContext: d.conversationContext || {},
