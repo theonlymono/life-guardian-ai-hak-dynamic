@@ -12,6 +12,7 @@ import {
   mergeLifeEvents,
   mergeProfile,
   mergeUnknowns,
+  rejectUnrelatedCommitmentEdits,
 } from "@/lib/engagement/context-merge";
 import {
   MAX_ENGAGEMENT_QUESTIONS,
@@ -107,6 +108,7 @@ export async function runCompleteAction(args: {
     question: args.action.question,
     answer: args.answer,
     topicKey: args.action.topicKey,
+    unitHint: args.action.unitHint,
   });
 
   const completed: CompletedAction = {
@@ -122,7 +124,14 @@ export async function runCompleteAction(args: {
     ...args.context,
     profile: mergeProfile(args.context.profile, interpretation.profileUpdates),
     lifeEvents: mergeLifeEvents(args.context.lifeEvents, interpretation.newLifeEvents),
-    commitments: mergeCommitments(args.context.commitments, interpretation.newCommitments),
+    commitments: mergeCommitments(
+      args.context.commitments,
+      rejectUnrelatedCommitmentEdits(
+        args.context.commitments,
+        interpretation.newCommitments,
+        args.action.topicKey,
+      ),
+    ),
     unknownImportantInformation: mergeUnknowns(
       args.context.unknownImportantInformation,
       interpretation.newlyUnknown,

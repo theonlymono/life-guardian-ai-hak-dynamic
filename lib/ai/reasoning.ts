@@ -17,6 +17,7 @@ import {
 import { selectFallbackAction } from "@/lib/engagement/daily-action";
 import { fallbackSummary } from "@/lib/engagement/summary-fallback";
 import { hasNumericEvidence } from "@/lib/risk/engine";
+import { myanmarDigitsToLatin, parseMoney } from "@/lib/i18n/money";
 import {
   completedTopicKeys,
   fallbackPressureQuestion,
@@ -95,7 +96,7 @@ export async function generateDailyAction(
     if (!parsed.success) {
       throw new Error("INVALID_AI_RESPONSE");
     }
-    const action = draftToAction(parsed.data);
+    const action = draftToAction(parsed.data, language);
     const draftText = [
       action.title,
       action.reason,
@@ -202,6 +203,7 @@ export async function interpretAnswer(args: {
   question: string;
   answer: string | number | boolean;
   topicKey?: string;
+  unitHint?: string;
 }): Promise<AnswerInterpretation> {
   if (!isAiConfigured()) {
     if (isDemoBackupMode()) {
@@ -259,14 +261,43 @@ export function dropUnsupportedNumbers(
   };
 }
 
-function draftToAction(draft: DailyActionDraft): DailyAction {
+/** Units we can state with certainty from the topic alone. */
+const TOPIC_UNITS: Record<string, Record<SupportedLanguage, string>> = {
+  months: { en: "months", my: "လ" },
+  years: { en: "years", my: "နှစ်" },
+  age: { en: "years old", my: "နှစ်" },
+  people: { en: "people", my: "ဦး" },
+  money: { en: "MMK", my: "သိန်း" },
+};
+
+function unitForTopic(
+  topicKey: string,
+  language: SupportedLanguage,
+): string | undefined {
+  const key = topicKey.toLowerCase();
+  if (/month/.test(key)) return TOPIC_UNITS.months[language];
+  if (/age|retirement/.test(key)) return TOPIC_UNITS.age[language];
+  if (/year/.test(key)) return TOPIC_UNITS.years[language];
+  if (/dependents|children/.test(key)) return TOPIC_UNITS.people[language];
+  if (/saving|income|amount|cost|fund|debt|loan/.test(key)) return TOPIC_UNITS.money[language];
+  return undefined;
+}
+
+function draftToAction(draft: DailyActionDraft, language: SupportedLanguage): DailyAction {
+  const numeric = draft.actionType === "numeric_input";
+  const unitHint = numeric ? (draft.unitHint ?? unitForTopic(draft.topicKey, language)) : undefined;
+
   return withActionId({
     focus: draft.focus,
     title: draft.title,
     reason: draft.reason,
-    actionType: draft.actionType,
+    // A number with no unit cannot be read back safely, and guessing the scale
+    // is how a "3" becomes 300,000. If we cannot name the unit, let the
+    // customer write it themselves.
+    actionType: numeric && !unitHint ? "text_question" : draft.actionType,
     question: draft.question,
     options: draft.options,
+    unitHint,
     estimatedMinutes: draft.estimatedMinutes,
     expectedImpact: draft.expectedImpact,
     topicKey: draft.topicKey,
@@ -318,35 +349,30 @@ export function isCleanForLanguage(text: string, language: SupportedLanguage): b
 }
 
 function heuristicInterpretation(args: {
+  language?: SupportedLanguage;
   question: string;
   answer: string | number | boolean;
   topicKey?: string;
 }): AnswerInterpretation {
   const text = String(args.answer);
-  const amountMatch = text.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*(million|million|သန်း)?/i);
-  let amount: number | undefined;
-  let currency: string | undefined;
-  if (amountMatch) {
-    amount = Number(amountMatch[1]);
-    if (/million|သန်း/i.test(text)) amount *= 1_000_000;
-    if (/¥|yen|jpy|ယန်း/i.test(text)) currency = "JPY";
-  }
+  const money = parseMoney(text, args.language ?? "en");
 
   const newCommitments =
-    args.topicKey === "education_savings" && amount
+    args.topicKey === "education_savings" && money
       ? [
           {
             type: "education_savings",
-            amount,
-            currency,
+            amount: money.amount,
+            currency: money.currency,
             description: "Education savings stated by the customer",
           },
         ]
       : args.topicKey === "emergency_fund_months"
         ? [
             {
+              // A month count, not money: read the bare number and nothing else.
               type: "emergency_savings",
-              amount: Number(text.match(/(\d+(?:\.\d+)?)/)?.[1] ?? undefined),
+              amount: Number(myanmarDigitsToLatin(text).match(/(\d+(?:\.\d+)?)/)?.[1] ?? undefined),
               description: "Emergency savings in months of essential expenses",
             },
           ]

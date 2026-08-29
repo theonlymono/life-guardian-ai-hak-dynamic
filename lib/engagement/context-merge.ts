@@ -61,10 +61,11 @@ export function mergeCommitments(
 ): FinancialCommitment[] {
   const merged = [...current];
   for (const item of incoming) {
+    // Match on type alone. A new amount for a type we already hold is the
+    // customer correcting themselves, not a second mortgage — appending it
+    // would leave two conflicting balances with no way to tell which is live.
     const duplicate = merged.find(
-      (existing) =>
-        normalize(existing.type) === normalize(item.type) &&
-        (item.amount === undefined || existing.amount === item.amount),
+      (existing) => normalize(existing.type) === normalize(item.type),
     );
     if (duplicate) {
       duplicate.amount = item.amount ?? duplicate.amount;
@@ -81,6 +82,34 @@ export function mergeCommitments(
     });
   }
   return merged;
+}
+
+/**
+ * Keeps an answer about one topic from rewriting a figure about another.
+ *
+ * Asked what they had saved for university, a customer answered "3" and the
+ * model returned it as a mortgage of 300,000 — silently replacing the
+ * 300,000,000 balance they gave in their own story. An answer may add a
+ * commitment we have never seen, but it may only change an existing amount
+ * when the question was actually about that commitment.
+ */
+export function rejectUnrelatedCommitmentEdits<
+  T extends { type: string; amount?: number },
+>(current: FinancialCommitment[] = [], incoming: T[] = [], topicKey?: string): T[] {
+  const held = new Map(current.map((item) => [normalize(item.type), item]));
+
+  return incoming.filter((item) => {
+    const existing = held.get(normalize(item.type));
+    if (!existing || existing.amount === undefined) return true;
+    if (item.amount === undefined || item.amount === existing.amount) return true;
+    return topicKey ? sharesAWord(topicKey, item.type) : false;
+  });
+}
+
+function sharesAWord(a: string, b: string): boolean {
+  const words = (value: string) => new Set(normalize(value).split(/[^a-z0-9]+/).filter(Boolean));
+  const left = words(a);
+  return [...words(b)].some((word) => left.has(word));
 }
 
 export function mergeUnknowns(

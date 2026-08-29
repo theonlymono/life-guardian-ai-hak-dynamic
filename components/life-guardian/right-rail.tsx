@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import type { RiskLevel } from "@/lib/types/life-context"
+import { formatMoney } from "@/lib/i18n/money"
 import { useSession, type PanelKey } from "./session-provider"
 import { CATEGORY_LABELS, t } from "./copy"
 
@@ -107,7 +108,7 @@ export function RightRail() {
                 {item.amount !== undefined ? (
                   <span className="text-muted-foreground">
                     {" "}
-                    · {item.amount.toLocaleString()} {item.currency ?? ""}
+                    · {formatMoney(item.amount, item.currency, language)}
                   </span>
                 ) : null}
               </p>

@@ -64,6 +64,11 @@ export interface DailyAction {
   actionType: DailyActionType;
   question: string;
   options?: string[];
+  /**
+   * The unit a numeric answer is expected in — "သိန်း", "months", "years".
+   * Shown beside the input so a bare "2" cannot be read as the wrong scale.
+   */
+  unitHint?: string;
   estimatedMinutes: number;
   expectedImpact: string;
   topicKey?: string;

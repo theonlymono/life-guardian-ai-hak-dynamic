@@ -11,7 +11,8 @@ const language = process.argv[2] === "my" ? "my" : "en";
 
 const STORY = {
   en: "I'm 42. My wife isn't working. We have two children. We still have a ¥35 million mortgage. My father is 78 and may need care soon. My oldest son starts university in two years.",
-  my: "ကျွန်တော် အသက် ၄၂ နှစ်ရှိပါပြီ။ ဇနီးက အခုအလုပ်မလုပ်ပါဘူး။ ကလေးနှစ်ယောက်ရှိပါတယ်။ အိမ်ချေးငွေ ယန်း ၃၅ သန်းလောက်ကျန်သေးတယ်။ အဖေက အသက် ၇၈ နှစ်ရှိပြီး မကြာခင် စောင့်ရှောက်မှုလိုလာနိုင်ပါတယ်။ အကြီးဆုံးသားက နောက်နှစ်နှစ်အတွင်း တက္ကသိုလ်တက်တော့မှာပါ။",
+  // Kyat, written the way a Myanmar customer writes it: သိန်း, no currency named.
+  my: "ကျွန်တော် အသက် ၄၂ နှစ်ရှိပါပြီ။ ဇနီးက အခုအလုပ်မလုပ်ပါဘူး။ ကလေးနှစ်ယောက်ရှိပါတယ်။ အိမ်ချေးငွေ သိန်း ၃၀၀၀ ကျန်သေးတယ်။ အဖေက အသက် ၇၈ နှစ်ရှိပြီး မကြာခင် စောင့်ရှောက်မှုလိုလာနိုင်ပါတယ်။ အကြီးဆုံးသားက နောက်နှစ်နှစ်အတွင်း တက္ကသိုလ်တက်တော့မှာပါ။",
 };
 
 /**
@@ -25,7 +26,7 @@ const VAGUE_ANSWER = {
 };
 
 function answerFor(action) {
-  if (action.actionType === "numeric_input") return 2;
+  if (action.actionType === "numeric_input") return 3;
   if (action.actionType === "confirmation") return true;
   if (action.actionType === "multiple_choice" && action.options?.length) return action.options[0];
   return VAGUE_ANSWER[language];
@@ -84,7 +85,11 @@ while (action && asked <= total + 2) {
 
   if (action) {
     asked += 1;
-    line(`Q${asked}`, action.question);
+    line(`Q${asked}`, `${action.question}${action.unitHint ? `  [${action.unitHint}]` : ""}`);
+    // A number without a stated unit is open to being read at the wrong scale.
+    if (action.actionType === "numeric_input" && !action.unitHint) {
+      failures.push(`Q${asked} asks for a number but names no unit`);
+    }
     if (result.summary) failures.push(`turn ${asked}: returned both a question and a summary`);
   } else {
     if (!result.summary) failures.push("stopped asking but returned no summary");
@@ -146,7 +151,29 @@ context.completedActions.forEach((done, index) => {
   }
 });
 for (const commitment of context.commitments) {
-  console.log(`  commitment: ${commitment.type} = ${commitment.amount ?? "(none)"} ${commitment.currency ?? ""}`);
+  console.log(
+    `  commitment: ${commitment.type} = ${commitment.amount ?? "(none)"} ${commitment.currency ?? ""}`,
+  );
+}
+
+const types = context.commitments.map((item) => item.type.toLowerCase());
+const repeated = types.find((type, index) => types.indexOf(type) !== index);
+if (repeated) failures.push(`two "${repeated}" commitments with conflicting amounts`);
+
+// The Burmese story says သိန်း ၃၀၀၀ and names no currency: that is 300,000,000 kyat.
+if (language === "my") {
+  const mortgage = context.commitments.find((item) => /mortgage/i.test(item.type));
+  if (!mortgage) {
+    failures.push("the mortgage was dropped from the context");
+  } else if (mortgage.amount !== 300_000_000) {
+    failures.push(`read သိန်း ၃၀၀၀ as ${mortgage.amount}, expected 300000000`);
+  } else if (mortgage.currency !== "MMK") {
+    failures.push(`currency came back as ${mortgage.currency}, expected MMK`);
+  }
+  const summaryText = result.summary
+    ? [result.summary.situation, ...result.summary.plan.map((s) => s.detail)].join(" ")
+    : "";
+  if (/JPY|¥|yen/i.test(summaryText)) failures.push("kyat was reported back as yen");
 }
 
 console.log(`\ntotal questions asked: ${asked} (cap ${total})`);

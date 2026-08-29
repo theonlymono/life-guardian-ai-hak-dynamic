@@ -21,7 +21,13 @@ Schema:
 Rules:
 - dependents counts children and other people financially supported. Do NOT count a non-working spouse (that is captured by incomeStructure). Do NOT count an aging parent unless the user says they already support them financially.
 - incomeStructure=single_income if the user says a spouse/partner is not working or they are the only earner.
-- Convert currency words like "¥35 million" to amount 35000000 and currency "JPY".
+- amount is always the full number of currency units. Convert scale words before writing it:
+  - "¥35 million" → amount 35000000, currency "JPY"
+  - "သိန်း ၃၀၀၀" or "၃၀၀၀ သိန်း" → amount 300000000, currency "MMK" (သိန်း = 100,000)
+  - "၁၅ သိန်း" → amount 1500000, currency "MMK"
+  - "၃ သန်း" → amount 3000000, currency "MMK" (သန်း = 1,000,000)
+  - "၂ ကုဋေ" → amount 20000000, currency "MMK" (ကုဋေ = 10,000,000)
+- Myanmar customers usually state money in သိန်း and often omit the currency. When the input is Burmese and no currency is named, currency is "MMK". An explicitly named currency always wins.
 - Keep type keys in English: education, mortgage, elder_care, job_loss, pregnancy, retirement, housing.
 - evidence must quote or closely paraphrase the user's words.
 - unknownImportantInformation should name missing high-value facts such as "emergency savings", "education savings", "care sharing".
@@ -52,6 +58,7 @@ JSON schema:
   "actionType": "text_question" | "numeric_input" | "multiple_choice" | "confirmation",
   "question": string,
   "options"?: string[],
+  "unitHint"?: string,
   "estimatedMinutes": number,
   "expectedImpact": string,
   "topicKey": string,
@@ -59,6 +66,8 @@ JSON schema:
 }
 
 topicKey must be a stable English snake_case key such as education_savings, emergency_fund_months, elder_care_shared, retirement_age, current_pressure.
+
+Set unitHint whenever actionType is "numeric_input", written in the requested language. It is the unit the number will be counted in — "months", "years", "လ", "နှစ်", "သိန်း". For money from a Myanmar customer use "သိန်း". Without it a bare "2" is unreadable, and guessing the scale later would put a figure in their mouth. Omit unitHint for every other actionType.
 Keep category/technical meaning stable even when language is Myanmar.
 
 assistantMessage must get to the point. Write 2-3 short sentences in this order:
@@ -75,7 +84,12 @@ Language rules for title, reason, question, options, expectedImpact, and assista
 - Write them ENTIRELY in the requested language. Never mix two languages in one sentence.
 - When language is "my", use natural Burmese only. Do not emit Chinese, Japanese, Thai, or Latin characters except for numbers, currency codes, and proper nouns.
 - Do not copy English stock phrases literally into Myanmar. Express "Based on what you shared" and "One useful next step could be" using natural Burmese equivalents.
-- Preserve numbers, amounts, currencies, dates, and names exactly as stated.`;
+- Preserve numbers, amounts, currencies, dates, and names exactly as stated.
+
+Money rules:
+- Never state a price, cost, fee or market rate the customer did not give you. You do not know what a school, a house or a treatment costs. If a figure like that is needed, the action is to go and find it out.
+- Never suggest a target amount you invented. Ask for the number instead.
+- When writing Burmese, express kyat the way Burmese readers say it: သိန်း for 100,000 and above (၃၀၀,၀၀၀,၀၀၀ ကျပ် is written ၃,၀၀၀ သိန်း). Use Burmese numerals. Never convert between currencies.`;
 
 export function actionUserPrompt(args: {
   language: SupportedLanguage;
@@ -123,10 +137,12 @@ Rules:
   - basedOn: which of their own answers or facts makes this step necessary. Quote their figures where they gave them.
   - A step must be finishable by the customer alone in a sitting or two. Never "restructure your portfolio". Never tell them to buy, switch or cancel any financial product.
   - Use only figures the customer stated. You may add or subtract figures they gave you, but if a target amount needs a number they never provided, write the step so it produces that number instead of guessing it.
+  - Never quote a price, tuition, premium or market rate. You do not know what things cost where they live, and a wrong figure here is worse than no figure.
 - caution: one line reminding them this is based only on what they shared and that major decisions are worth discussing with a qualified professional.
 - No medical diagnosis, no binding financial advice, no guaranteed outcomes, no product recommendations.
 - Write every field ENTIRELY in the requested language. Never mix two languages in one sentence.
-- The LifeContext you receive holds English technical keys and may hold English explanations. Translate their meaning; never copy an English word or phrase into Burmese output. Only numbers, amounts, currency codes and proper names stay verbatim.`;
+- The LifeContext you receive holds English technical keys and may hold English explanations. Translate their meaning; never copy an English word or phrase into Burmese output. Only numbers, amounts, currency codes and proper names stay verbatim.
+- Amounts in the context are stored as full currency units. When writing Burmese, convert kyat into သိန်း the way Burmese readers say it — an amount of 300000000 MMK is written ၃,၀၀၀ သိန်း, and 1500000 MMK is ၁၅ သိန်း. Use Burmese numerals. Never convert between currencies.`;
 
 export function summaryUserPrompt(args: {
   language: SupportedLanguage;
@@ -155,18 +171,22 @@ Respond with JSON only.
   "notes": string
 }
 
-If the user states ¥1.5 million, amount=1500000 and currency="JPY".
+amount is the full number of currency units. "¥1.5 million" → amount=1500000, currency="JPY". "၁၅ သိန်း" → amount=1500000, currency="MMK" (သိန်း = 100,000; သန်း = 1,000,000; ကုဋေ = 10,000,000). A Burmese answer that names no currency is "MMK".
 
-interpretedAnswer must be a number whenever the question asks for a quantity — a count of months, years, people, or an amount — no matter which language the answer is written in. "About one month", "တစ်လစာလောက်ပဲ ရှိပါတယ်" and "၁ လ" all become the number 1. Only fall back to a string when the answer genuinely is not a quantity.`;
+interpretedAnswer must be a number whenever the question asks for a quantity — a count of months, years, people, or an amount — no matter which language the answer is written in. "About one month", "တစ်လစာလောက်ပဲ ရှိပါတယ်" and "၁ လ" all become the number 1. Only fall back to a string when the answer genuinely is not a quantity.
+
+Never supply a figure the answer does not contain. "I'm working on it" or "စဉ်းစားနေတုန်းပါ" is NOT zero — it is a string, with no commitment and no resolved unknown. Only treat it as 0 when the customer actually says none, zero, or မရှိ.`;
 
 export function interpretUserPrompt(args: {
   language: SupportedLanguage;
   question: string;
   answer: string | number | boolean;
   topicKey?: string;
+  unitHint?: string;
 }): string {
   return `Language: ${args.language}
 Question: ${args.question}
 topicKey: ${args.topicKey ?? "unknown"}
+${args.unitHint ? `The answer is given in: ${args.unitHint}. Do not assume any other unit.` : ""}
 Answer: ${String(args.answer)}`;
 }

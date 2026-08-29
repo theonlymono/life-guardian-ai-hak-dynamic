@@ -54,6 +54,16 @@ If `DEMO_BACKUP_MODE=true`, a clearly labeled deterministic sample path may run 
 
 Next.js App Router route handlers deploy as Netlify Functions via the Next runtime. Secrets stay in environment variables. Set `GEMINI_API_KEY` in the Netlify UI; never prefix it with `NEXT_PUBLIC_`.
 
+## Money
+
+Amounts are stored as whole currency units with an ISO-ish code, and never converted between currencies — we have no rate and no business quoting one.
+
+Myanmar customers write money in သိန်း (100,000), not in millions: a home loan is "သိန်း ၃၀၀၀". `lib/i18n/money.ts` reads that (either word order, both digit scripts, plus သန်း, ကုဋေ, သောင်း and the English scale words) and renders it back the same way, so ၃၀၀,၀၀၀,၀၀၀ ကျပ် is shown as ၃,၀၀၀ သိန်း. Burmese input that names no currency defaults to MMK; an explicit marker always wins.
+
+Two rules keep figures honest. Nobody may quote a price: the model does not know what a school, a house or a premium costs where the customer lives, so when a cost is needed the action is to go and find it out. And every `numeric_input` action carries a `unitHint` shown beside the field, because a bare "3" answered to a money question is unreadable — read at the wrong scale it became 300,000, and that figure then overwrote a real mortgage balance. When the unit cannot be named from the topic, the action degrades to free text so the customer writes the unit themselves.
+
+`rejectUnrelatedCommitmentEdits` closes the other half of that bug: an answer may add a commitment we have never held, but it may only change an existing amount when the question was actually about that commitment. `mergeCommitments` then matches on type alone, so a corrected balance replaces the old one instead of leaving two conflicting mortgages in the context.
+
 ## Output guards
 
 Gemini leaks foreign glyphs into Burmese output — CJK, Thai, and in one observed case a single Gurmukhi character inside an otherwise correct Burmese word. `isCleanForLanguage` works from an allow-list of scripts rather than a list of known-bad ones, because enumerating offenders only ever catches the leaks already seen.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type KeyboardEvent } from "react"
+import { useState, type KeyboardEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon, Clock01Icon } from "@hugeicons/core-free-icons"
@@ -13,17 +13,15 @@ export function ActionCard() {
   const [value, setValue] = useState("")
   const copy = t(language)
 
-  // A new question deserves an empty field, not the previous answer.
-  useEffect(() => {
-    setValue("")
-  }, [currentAction?.id])
-
   if (!currentAction) return null
 
   const action = currentAction
   const canSend = value.trim().length > 0 && !loading
 
   function send(answer: string | number | boolean) {
+    // Clear here rather than when the next question arrives: sending is the
+    // only route to one, and the field should empty the moment they hit send.
+    setValue("")
     void submitAnswer(answer)
   }
 
@@ -126,19 +124,25 @@ export function ActionCard() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <input
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={loading}
-              inputMode={action.actionType === "numeric_input" ? "decimal" : "text"}
-              placeholder={
-                action.actionType === "numeric_input"
-                  ? copy.enterNumber
-                  : copy.typeAnswer
-              }
-              className="h-10 min-w-0 flex-1 rounded-full border border-border/70 bg-[#f7f8f9] px-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-[#0084ff]/50 focus:bg-white disabled:opacity-60"
-            />
+            <div className="flex h-10 min-w-0 flex-1 items-center rounded-full border border-border/70 bg-[#f7f8f9] pr-4 transition-colors focus-within:border-[#0084ff]/50 focus-within:bg-white">
+              <input
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={loading}
+                inputMode={action.actionType === "numeric_input" ? "decimal" : "text"}
+                placeholder={
+                  action.actionType === "numeric_input" ? copy.enterNumber : copy.typeAnswer
+                }
+                className="h-full min-w-0 flex-1 rounded-full bg-transparent px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
+              />
+              {/* Without the unit, "2" could be two months or two hundred thousand. */}
+              {action.unitHint ? (
+                <span className="shrink-0 whitespace-nowrap text-[13px] text-muted-foreground">
+                  {action.unitHint}
+                </span>
+              ) : null}
+            </div>
             <Button
               size="icon-sm"
               disabled={!canSend}

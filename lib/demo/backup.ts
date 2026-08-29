@@ -1,6 +1,7 @@
 import type { AnswerInterpretation, ExtractionResult } from "@/lib/ai/schemas";
 import { selectFallbackAction } from "@/lib/engagement/daily-action";
 import { fallbackPressureQuestion, isRepeatedQuestion } from "@/lib/engagement/repetition";
+import { parseMoney } from "@/lib/i18n/money";
 import type {
   DailyAction,
   LifeContext,
@@ -50,8 +51,10 @@ export function demoExtraction(input: string, language: SupportedLanguage): Extr
       commitments: [
         {
           type: "mortgage",
-          amount: 35_000_000,
-          currency: "JPY",
+          // Read from what they actually typed, so a Burmese "သိန်း ၃၀၀၀"
+          // stays kyat and a yen figure stays yen. Even in demo mode we do
+          // not put a currency in the customer's mouth.
+          ...parseMoney(input, language),
           description: "Existing mortgage",
         },
       ],
@@ -115,8 +118,7 @@ export function demoExtraction(input: string, language: SupportedLanguage): Extr
       commitments: [
         {
           type: "savings",
-          amount: 20_000_000,
-          currency: "JPY",
+          ...parseMoney(input, language),
           description: "Stated savings",
         },
       ],
@@ -149,25 +151,31 @@ export function demoDailyAction(
 }
 
 export function demoAnswerInterpretation(args: {
+  language?: SupportedLanguage;
   question: string;
   answer: string | number | boolean;
   topicKey?: string;
 }): AnswerInterpretation {
   const text = String(args.answer);
   if (args.topicKey === "education_savings" || /saved|စု/i.test(args.question)) {
+    const money = parseMoney(text, args.language ?? "en");
     return {
       interpretedAnswer: args.answer,
       profileUpdates: {},
       newLifeEvents: [],
-      newCommitments: [
-        {
-          type: "education_savings",
-          amount: 1_500_000,
-          currency: "JPY",
-          description: "Education savings confirmed by customer",
-        },
-      ],
-      resolvedUnknowns: ["education savings"],
+      // No figure in the answer means no commitment. Demo mode still may not
+      // report savings the customer never mentioned.
+      newCommitments: money
+        ? [
+            {
+              type: "education_savings",
+              amount: money.amount,
+              currency: money.currency,
+              description: "Education savings confirmed by customer",
+            },
+          ]
+        : [],
+      resolvedUnknowns: money ? ["education savings"] : [],
       newlyUnknown: [],
       notes: "DEMO_BACKUP_MODE interpretation of education savings.",
     };
