@@ -53,6 +53,6 @@ When extraction yields no usable facts, `hasEnoughContext` short-circuits to a s
 - **Cursor** — backend engineering, prompts, tests, docs
 - **Google Gemini** — `gemini-3.5-flash-lite` for extraction and wording
 - **n8n** — LIFE GUARDIAN AI v2 pipeline plus follow-up orchestration
-- **Wispr Flow** — development productivity (voice prompting / iteration), not a production backend
+- **Wispr Flow** — development productivity (voice prompting / iteration) and demo voice input by dictating into the composer, not a production backend
 - **Mobbin** — UX inspiration used by the frontend teammate
 - **Netlify** — public web deployment

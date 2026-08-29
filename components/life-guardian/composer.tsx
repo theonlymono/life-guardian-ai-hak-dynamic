@@ -1,6 +1,6 @@
 "use client"
 
-import { type KeyboardEvent } from "react"
+import { useRef, useState, type KeyboardEvent } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -18,12 +18,24 @@ export function Composer({ compact = false }: { compact?: boolean }) {
   const { draft, setDraft, submitInput, loading, started, language, reset } = useSession()
   const copy = t(language)
   const canSend = draft.trim().length > 0 && !loading
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showDictateHint, setShowDictateHint] = useState(false)
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       void submitInput(draft)
     }
+  }
+
+  /*
+   * We do not record audio. Wispr Flow is an OS-level dictation tool that types
+   * into whatever field has focus, so the honest thing this button can do is
+   * put the caret here and say so.
+   */
+  function focusForDictation() {
+    textareaRef.current?.focus()
+    setShowDictateHint(true)
   }
 
   return (
@@ -44,6 +56,7 @@ export function Composer({ compact = false }: { compact?: boolean }) {
         )}
       >
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -84,9 +97,10 @@ export function Composer({ compact = false }: { compact?: boolean }) {
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled
-              title="Voice input is not part of this build"
-              className="size-8 rounded-full text-muted-foreground disabled:opacity-30"
+              onClick={focusForDictation}
+              title={copy.dictate}
+              aria-label={copy.dictate}
+              className="size-8 rounded-full text-muted-foreground"
             >
               <HugeiconsIcon icon={Mic01Icon} strokeWidth={1.5} />
             </Button>
@@ -106,6 +120,17 @@ export function Composer({ compact = false }: { compact?: boolean }) {
           </div>
         </div>
       </div>
+
+      {showDictateHint && (
+        <p className="relative mt-2 flex items-start gap-1.5 px-1 text-[11px] leading-relaxed text-muted-foreground">
+          <HugeiconsIcon
+            icon={Mic01Icon}
+            strokeWidth={1.5}
+            className="mt-0.5 size-3 shrink-0"
+          />
+          <span className="min-w-0">{copy.dictateHint}</span>
+        </p>
+      )}
     </div>
   )
 }

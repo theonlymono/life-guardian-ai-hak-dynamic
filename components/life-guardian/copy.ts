@@ -19,6 +19,9 @@ export const UI_COPY = {
     send: "Send",
     thinking: "Working on it",
     startOver: "Start over",
+    dictate: "Speak instead of typing",
+    dictateHint:
+      "The box is focused. Hold your system dictation hotkey (Wispr Flow) and speak — the words land here, then press Enter.",
 
     stepRead: "Reading your life story",
     stepUnderstand: "Understanding your answer",
@@ -65,6 +68,9 @@ export const UI_COPY = {
     send: "ပို့မည်",
     thinking: "ဆောင်ရွက်နေသည်",
     startOver: "အစကပြန်စမည်",
+    dictate: "စာမရိုက်ဘဲ ပြောမည်",
+    dictateHint:
+      "အကွက်ကို ရွေးထားပြီးပါပြီ။ စက်ရဲ့ dictation hotkey (Wispr Flow) ကို ဖိပြီး ပြောလိုက်ပါ — စာက ဒီမှာ ဝင်လာမည်၊ ပြီးရင် Enter နှိပ်ပါ။",
 
     stepRead: "သင့်ဘဝအကြောင်း ဖတ်နေသည်",
     stepUnderstand: "သင့်အဖြေကို နားလည်နေသည်",

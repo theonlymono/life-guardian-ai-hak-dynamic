@@ -100,10 +100,20 @@ Set the same environment variables in the Netlify UI. Do not prefix secrets with
 |---|---|
 | Cursor | Primary AI-assisted engineering environment for backend, prompts, tests, and docs |
 | n8n | Follow-up / engagement orchestration after an action is completed |
-| Wispr Flow | Voice-driven development, prompting, iteration, and documentation — not a production backend |
+| Wispr Flow | Voice-driven development (prompting, iteration, docs) and voice input during the demo, via OS-level dictation — **not** an API integration |
 | Mobbin | UX inspiration for information hierarchy and daily engagement patterns (frontend teammate) |
 | Netlify | Public web deployment |
 | Google Gemini (`gemini-3.5-flash-lite`) | Natural-language extraction and personalized wording |
+
+### Voice
+
+There is no speech code in this repository, and no audio ever reaches our servers.
+
+Wispr Flow's [API is not public](https://docs.wisprflow.ai/articles/2194989923-looking-to-connect-to-wispr-through-api) — it is gated behind enterprise approval, and a Pro subscription does not include developer access. Rather than claim an integration we do not have, we use Wispr Flow the way it is actually built to work: as an OS-level dictation tool that types into whichever field has focus.
+
+To speak instead of type, click the mic button in the composer (it moves the caret into the input) and hold your Wispr Flow hotkey. The transcript lands in the box like any other keystrokes; press Enter to send.
+
+Spoken replies are deliberately out of scope. Browser speech synthesis has no Burmese voice, so an English-only voice loop would have quietly made the product worse in one of its two supported languages.
 
 ## Safety
 
