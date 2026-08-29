@@ -160,6 +160,41 @@ export const followUpRequestSchema = z.object({
   nextAction: dailyActionSchema.optional(),
 });
 
+export const chatLogRequestSchema = z.object({
+  sessionId: z.string().trim().min(1).max(200),
+  language: supportedLanguageSchema.optional(),
+  kind: z.enum(["analyze", "answer", "update"]),
+  userText: z.string().max(8000).default(""),
+  assistantText: z.string().max(8000).optional(),
+  action: z
+    .object({
+      focus: z.string().max(200),
+      question: z.string().max(2000),
+      topicKey: z.string().max(200).optional(),
+    })
+    .optional(),
+  risks: z
+    .array(
+      z.object({
+        category: riskCategorySchema,
+        score: z.number().min(0).max(100),
+        level: riskLevelSchema,
+      }),
+    )
+    .default([]),
+  riskMoves: z
+    .array(
+      z.object({
+        category: riskCategorySchema,
+        fromScore: z.number(),
+        toScore: z.number(),
+        fromLevel: riskLevelSchema,
+        toLevel: riskLevelSchema,
+      }),
+    )
+    .default([]),
+});
+
 export type ExtractionResult = z.infer<typeof extractionResultSchema>;
 export type DailyActionDraft = z.infer<typeof dailyActionDraftSchema>;
 export type AnswerInterpretation = z.infer<typeof answerInterpretationSchema>;

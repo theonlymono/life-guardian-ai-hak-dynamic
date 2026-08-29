@@ -2,6 +2,9 @@ import type {
   CompletedAction,
   DailyAction,
   LifeContext,
+  RiskCategory,
+  RiskLevel,
+  RiskScore,
   SupportedLanguage,
 } from "@/lib/types/life-context";
 
@@ -81,11 +84,38 @@ export interface FollowUpResponse {
   workflowStatus: "scheduled" | "unavailable";
 }
 
+export type ChatTurnKind = "analyze" | "answer" | "update";
+
+export interface ChatRiskMove {
+  category: RiskCategory;
+  fromScore: number;
+  toScore: number;
+  fromLevel: RiskLevel;
+  toLevel: RiskLevel;
+}
+
+export interface ChatLogRequest {
+  sessionId: string;
+  language?: SupportedLanguage;
+  kind: ChatTurnKind;
+  userText: string;
+  assistantText?: string;
+  action?: Pick<DailyAction, "focus" | "question"> & { topicKey?: string };
+  risks?: Pick<RiskScore, "category" | "score" | "level">[];
+  riskMoves?: ChatRiskMove[];
+}
+
+export interface ChatLogResponse {
+  success: boolean;
+  stored: boolean;
+}
+
 export interface HealthResponse {
   status: "ok";
   service: "Life Guardian AI";
   timestamp: string;
   aiConfigured: boolean;
   n8nConfigured: boolean;
+  chatLogConfigured: boolean;
   demoBackupMode: boolean;
 }

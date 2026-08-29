@@ -33,6 +33,7 @@ Liveness and configuration flags. Never returns secrets.
   "timestamp": "2026-08-29T05:00:00.000Z",
   "aiConfigured": true,
   "n8nConfigured": false,
+  "chatLogConfigured": false,
   "demoBackupMode": false
 }
 ```
@@ -251,9 +252,53 @@ Forwards an engagement event to n8n. Core product must not depend on this succee
 
 ---
 
+## POST `/api/log-turn`
+
+Archives one conversation turn through n8n into MongoDB Atlas. Logging only — call it without awaiting and ignore the result.
+
+### Request
+
+```json
+{
+  "sessionId": "session_9f2c...",
+  "language": "en",
+  "kind": "answer",
+  "userText": "About one month",
+  "assistantText": "Your financial risk level is critical because...",
+  "action": {
+    "focus": "Education Savings",
+    "question": "How do you plan to fund university?",
+    "topicKey": "education_savings"
+  },
+  "risks": [{ "category": "finance", "score": 90, "level": "CRITICAL" }],
+  "riskMoves": [
+    { "category": "finance", "fromScore": 65, "toScore": 90, "fromLevel": "HIGH", "toLevel": "CRITICAL" }
+  ]
+}
+```
+
+`kind` is `analyze`, `answer`, or `update`. Only `sessionId` and `kind` are required.
+
+### Success
+
+```json
+{ "success": true, "stored": true }
+```
+
+### Storage unavailable
+
+Returns HTTP 200. A missing webhook URL, an unpublished workflow, or a failed Mongo insert all resolve here.
+
+```json
+{ "success": false, "stored": false }
+```
+
+---
+
 ## Frontend integration notes
 
 1. Keep `LifeContext` in client state (or localStorage). Send it back on later calls.
 2. Language switching does not change scores or category keys — only human-readable strings.
 3. After `complete-action`, replace stored context with `updatedContext` and render `nextAction`.
 4. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
+5. Optional: after every turn, call `/api/log-turn` in the background. Never await it or surface `stored: false`.

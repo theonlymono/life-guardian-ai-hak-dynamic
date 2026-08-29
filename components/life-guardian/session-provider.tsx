@@ -13,6 +13,7 @@ import {
 import type {
   AnalyzeResponse,
   ApiErrorBody,
+  ChatLogResponse,
   CompleteActionResponse,
   FollowUpResponse,
   LifeUpdateResponse,
@@ -173,6 +174,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  /**
+   * Archives the turn in MongoDB via n8n. Deliberately not awaited and never
+   * surfaced: losing an audit record is not worth interrupting the customer.
+   */
+  const archiveTurn = useCallback(
+    (args: {
+      kind: TurnKind
+      userText: string
+      assistantText: string
+      action: DailyAction | null
+      context: LifeContext
+      riskMoves: RiskMove[]
+    }) => {
+      void postJson<ChatLogResponse>("/api/log-turn", {
+        sessionId: sessionId.current,
+        language,
+        kind: args.kind,
+        userText: args.userText,
+        assistantText: args.assistantText,
+        action: args.action
+          ? {
+              focus: args.action.focus,
+              question: args.action.question,
+              topicKey: args.action.topicKey,
+            }
+          : undefined,
+        risks: args.context.risks.map((risk) => ({
+          category: risk.category,
+          score: risk.score,
+          level: risk.level,
+        })),
+        riskMoves: args.riskMoves,
+      }).catch(() => undefined)
+    },
+    [language],
+  )
+
   const reset = useCallback(() => {
     setContext(null)
     setCurrentAction(null)
@@ -216,14 +254,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         const next = "context" in data ? data.context : data.updatedContext
+        const riskMoves = diffRisks(context, next)
         closeTurn(turnId, {
           assistantText: data.assistantMessage,
-          riskMoves: diffRisks(context, next),
+          riskMoves,
           changes: "changesDetected" in data ? data.changesDetected : [],
         })
         setContext(next)
         setCurrentAction(data.dailyAction)
         setSource(data.source)
+        archiveTurn({
+          kind: isFirst ? "analyze" : "update",
+          userText: trimmed,
+          assistantText: data.assistantMessage,
+          action: data.dailyAction,
+          context: next,
+          riskMoves,
+        })
       } catch {
         setError(GENERIC_ERROR[language])
         closeTurn(turnId, { failed: true })
@@ -231,7 +278,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       }
     },
-    [closeTurn, context, language, loading, openTurn],
+    [archiveTurn, closeTurn, context, language, loading, openTurn],
   )
 
   const submitAnswer = useCallback(
@@ -256,13 +303,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return
         }
 
+        const riskMoves = diffRisks(context, data.updatedContext)
         closeTurn(turnId, {
           assistantText: data.assistantMessage,
-          riskMoves: diffRisks(context, data.updatedContext),
+          riskMoves,
         })
         setContext(data.updatedContext)
         setCurrentAction(data.nextAction)
         setSource(data.source)
+        archiveTurn({
+          kind: "answer",
+          userText: String(answer),
+          assistantText: data.assistantMessage,
+          action: data.nextAction,
+          context: data.updatedContext,
+          riskMoves,
+        })
 
         // n8n schedules the follow-up. A failure here must not affect the answer.
         setFollowUpStatus("pending")
@@ -286,7 +342,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       }
     },
-    [closeTurn, context, currentAction, language, loading, openTurn],
+    [archiveTurn, closeTurn, context, currentAction, language, loading, openTurn],
   )
 
   const value = useMemo<SessionValue>(

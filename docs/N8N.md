@@ -31,8 +31,46 @@ Set `N8N_WEBHOOK_URL` to the production webhook URL of this workflow.
 |---|---|---|---|
 | [LIFE GUARDIAN AI v2](https://hponekhantnaing.app.n8n.cloud/workflow/dkc73a5miL0yoHTM) | `dkc73a5miL0yoHTM` | `/webhook/life-guardian` | `POST /api/life-guardian` |
 | [Life Guardian Follow-up](https://hponekhantnaing.app.n8n.cloud/workflow/AhSwon9XpWLumpvg) | `AhSwon9XpWLumpvg` | `/webhook/life-guardian-follow-up` | `POST /api/follow-up` |
+| [Life Guardian Chat Log](https://hponekhantnaing.app.n8n.cloud/workflow/LmFbd0PmFaBikBaU) | `LmFbd0PmFaBikBaU` | `/webhook/life-guardian/chat-log` | `POST /api/log-turn` |
 
-Both are published and answering on their production URLs. v2 uses the `Google Gemini(PaLM) Api account` credential and the `gemini-3.5-flash-lite` model, matching the backend.
+The first two are published and answering on their production URLs. v2 uses the `Google Gemini(PaLM) Api account` credential and the `gemini-3.5-flash-lite` model, matching the backend.
+
+## Chat archive → MongoDB Atlas
+
+`Receive Chat Turn` → `Shape Chat Document` → `Store Chat Message` → `Respond Stored`
+
+Every conversation turn is archived as one document in the `chat_messages` collection, which is what makes the engagement KPIs in the README measurable — repeat interaction rate, action completion rate, and which focus areas customers actually answer.
+
+```json
+{
+  "sessionId": "session_9f2c...",
+  "language": "en",
+  "kind": "answer",
+  "userText": "About one month",
+  "assistantText": "Your financial risk level is critical because...",
+  "focus": "Education Savings",
+  "question": "How do you plan to fund university?",
+  "topicKey": "education_savings",
+  "risks": [{ "category": "finance", "score": 90, "level": "CRITICAL" }],
+  "riskMoves": [
+    { "category": "finance", "fromScore": 65, "toScore": 90, "fromLevel": "HIGH", "toLevel": "CRITICAL" }
+  ],
+  "createdAt": "2026-08-29T06:20:00.000Z"
+}
+```
+
+`createdAt` is written as a Mongo `Date`, so range queries work without casting.
+
+This path is logging only. `Store Chat Message` is set to `continueRegularOutput`, so a database failure still returns a webhook response, and `POST /api/log-turn` reports `stored: false` rather than failing. The browser calls it without awaiting: losing an audit record must never interrupt a customer.
+
+### Setup
+
+The workflow ships with an unfilled `mongoDb` credential placeholder named **MongoDB Atlas - LifeGuideDB**, because credentials cannot be created through the API. To finish it:
+
+1. In n8n, open the workflow and select **Store Chat Message**.
+2. Create the credential with **Configuration Type: Connection String**, the Atlas `mongodb+srv://` URI with the real username substituted for `<db_username>`, and a **Database** name.
+3. In Atlas, add the n8n Cloud egress IP under **Network Access**. This is the most common cause of a connection timeout here.
+4. Publish the workflow, then set `N8N_CHAT_LOG_WEBHOOK_URL` to its production URL.
 
 Source of truth for v2 lives in `n8n/life-guardian-compact.js`.
 
