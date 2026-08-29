@@ -183,15 +183,84 @@ export function isWithinYears(timeHorizon: string | undefined, years: number): b
   return parsed !== undefined && parsed <= years;
 }
 
+/** The model writes horizons as words as often as digits: "two years", "in 2 years". */
+const LATIN_WORDS: Record<string, number> = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  next: 1,
+};
+
+const MYANMAR_WORDS: Record<string, number> = {
+  တစ်: 1,
+  နှစ်: 2,
+  သုံး: 3,
+  လေး: 4,
+  ငါး: 5,
+  ခြောက်: 6,
+  ခုနစ်: 7,
+  ရှစ်: 8,
+  ကိုး: 9,
+  ဆယ်: 10,
+};
+
+const LATIN_WORD_PATTERN = Object.keys(LATIN_WORDS).join("|");
+const MYANMAR_WORD_PATTERN = Object.keys(MYANMAR_WORDS).join("|");
+const MYANMAR_DIGITS = "၀၁၂၃၄၅၆၇၈၉";
+
+function myanmarDigitsToLatin(text: string): string {
+  return text.replace(/[၀-၉]/g, (digit) => String(MYANMAR_DIGITS.indexOf(digit)));
+}
+
+/**
+ * Myanmar needs its own pass: JavaScript word boundaries do not apply to Burmese
+ * script, so "နှစ်နှစ်" (two years) has to be matched as number + unit directly.
+ */
+function matchQuantity(
+  text: string,
+  latinUnits: string,
+  myanmarUnit: string,
+): number | undefined {
+  const normalized = myanmarDigitsToLatin(text);
+
+  const digits = normalized.match(
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:${latinUnits}|${myanmarUnit})`, "i"),
+  );
+  if (digits) return Number(digits[1]);
+
+  const latin = normalized.match(
+    new RegExp(`\\b(${LATIN_WORD_PATTERN})\\b[\\s-]*(?:${latinUnits})`, "i"),
+  );
+  if (latin) return LATIN_WORDS[latin[1].toLowerCase()];
+
+  const myanmar = normalized.match(
+    new RegExp(`(${MYANMAR_WORD_PATTERN})\\s*(?:${myanmarUnit})`),
+  );
+  if (myanmar) return MYANMAR_WORDS[myanmar[1]];
+
+  return undefined;
+}
+
 export function parseYearHorizon(timeHorizon: string): number | undefined {
-  const years = timeHorizon.match(/(\d+(?:\.\d+)?)\s*(year|yr|နှစ်)/i);
-  if (years) return Number(years[1]);
-  const months = timeHorizon.match(/(\d+(?:\.\d+)?)\s*(month|လ)/i);
-  if (months) return Number(months[1]) / 12;
-  const weeks = timeHorizon.match(/(\d+(?:\.\d+)?)\s*(week|ပတ်)/i);
-  if (weeks) return Number(weeks[1]) / 52;
-  if (/immediate|now|today|ယခု|အခု/i.test(timeHorizon)) return 0;
-  const bare = Number(timeHorizon);
+  const years = matchQuantity(timeHorizon, "years?|yrs?", "နှစ်");
+  if (years !== undefined) return years;
+  const months = matchQuantity(timeHorizon, "months?", "လ");
+  if (months !== undefined) return months / 12;
+  const weeks = matchQuantity(timeHorizon, "weeks?", "ပတ်");
+  if (weeks !== undefined) return weeks / 52;
+  if (/immediate|now|today|soon|this year|ယခု|အခု|မကြာခင်/i.test(timeHorizon)) return 0;
+  const bare = Number(myanmarDigitsToLatin(timeHorizon));
   return Number.isFinite(bare) ? bare : undefined;
 }
 

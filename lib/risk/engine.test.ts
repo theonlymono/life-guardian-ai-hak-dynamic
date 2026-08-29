@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calculateRisks, detectMatchedRules } from "./engine";
+import { calculateRisks, detectMatchedRules, parseYearHorizon } from "./engine";
 import { capScore, riskLevelFromScore } from "./rules";
 import { emptyLifeContext } from "../types/life-context";
+
+test("time horizons written as words parse like digits", () => {
+  assert.equal(parseYearHorizon("2 years"), 2);
+  assert.equal(parseYearHorizon("two years"), 2);
+  assert.equal(parseYearHorizon("in two years"), 2);
+  assert.equal(parseYearHorizon("next year"), 1);
+  assert.equal(parseYearHorizon("six months"), 0.5);
+  assert.equal(parseYearHorizon("နှစ်နှစ်"), 2);
+  assert.equal(parseYearHorizon("soon"), 0);
+});
 
 test("risk level boundaries", () => {
   assert.equal(riskLevelFromScore(0), "LOW");

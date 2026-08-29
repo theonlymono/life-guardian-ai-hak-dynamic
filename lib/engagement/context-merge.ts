@@ -13,10 +13,19 @@ export function mergeProfile(
   current: UserProfile | undefined,
   incoming: UserProfile | undefined,
 ): UserProfile {
-  return {
+  const merged: UserProfile = {
     ...current,
     ...omitUndefined(incoming ?? {}),
   };
+  // "unknown" is the absence of an answer, not a correction. Never let it erase a known one.
+  if (
+    merged.incomeStructure === "unknown" &&
+    current?.incomeStructure &&
+    current.incomeStructure !== "unknown"
+  ) {
+    merged.incomeStructure = current.incomeStructure;
+  }
+  return merged;
 }
 
 export function mergeLifeEvents(

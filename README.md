@@ -45,6 +45,12 @@ See [docs/API.md](docs/API.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Frontend keeps `LifeContext` in client state and sends it back. No auth or database in this MVP.
 
+## Using the app
+
+`components/life-guardian/session-provider.tsx` holds the whole session — language, `LifeContext`, the current action and the thread — and every control reads from it.
+
+Describe your situation in the prompt box, or pick a suggestion chip to seed one. Answer the daily action with the buttons or field it renders, and the next question arrives already knowing what you said. **Life Pulse** shows the risk map with the reasoning behind each score, **Actions** lists what you have answered, and **EN / MY** in the top bar switches language without recomputing the context. Each completed answer also posts to `/api/follow-up`; if n8n is down the sidebar says so and the answer is still kept.
+
 ## Local development
 
 ```bash
