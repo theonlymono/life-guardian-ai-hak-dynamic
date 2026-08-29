@@ -64,6 +64,16 @@ Two rules keep figures honest. Nobody may quote a price: the model does not know
 
 `rejectUnrelatedCommitmentEdits` closes the other half of that bug: an answer may add a commitment we have never held, but it may only change an existing amount when the question was actually about that commitment. `mergeCommitments` then matches on type alone, so a corrected balance replaces the old one instead of leaving two conflicting mortgages in the context.
 
+## Projections
+
+Once a customer has named a dated goal, three answers turn the conversation into a number: what they have saved, what they think it will cost, and what they can add each month. `lib/simulation/goal.ts` does the arithmetic and `resolveGoalProgress` decides whether it can run yet.
+
+There is no interest or investment-return assumption anywhere in it. Contributions are added, nothing is compounded. A return rate would be the single most consequential figure in the projection and we would be the ones inventing it.
+
+The target is the customer's own estimate, asked for outright, because we do not know what a school near them charges. That is also why the three questions are curated rather than model-written: a projection is only worth showing if every figure in it traces back to a specific answer, which means the topic keys have to be fixed. When a goal is one answer short of projecting, the loop asks for that answer ahead of anything the model would choose — the customer gets a number back for the trouble of answering.
+
+The card shows their pace, the pace that would close the gap in time, and the same pace given more time. A what-if field re-runs the same function in the browser as they type; it is a rehearsal and writes nothing back to the context. The closing summary is handed the computed figures in its prompt rather than being asked to do the sums, since the model explains a gap well and computes one unreliably.
+
 ## Output guards
 
 Gemini leaks foreign glyphs into Burmese output — CJK, Thai, and in one observed case a single Gurmukhi character inside an otherwise correct Burmese word. `isCleanForLanguage` works from an allow-list of scripts rather than a list of known-bad ones, because enumerating offenders only ever catches the leaks already seen.

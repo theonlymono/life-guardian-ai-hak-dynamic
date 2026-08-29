@@ -148,11 +148,19 @@ export function summaryUserPrompt(args: {
   language: SupportedLanguage;
   contextJson: string;
   answeredCount: number;
+  projection?: string;
 }): string {
   const languageName = args.language === "my" ? "Myanmar (Burmese)" : "English";
   return `Language: ${args.language} — write every field in ${languageName} only.
 The customer answered ${args.answeredCount} questions. Report back; do not ask anything further.
-LifeContext JSON:
+${
+  args.projection
+    ? `Projection already calculated from their own figures — quote these numbers rather than recomputing or rounding them:
+${args.projection}
+Build at least one plan step around closing this gap.
+`
+    : ""
+}LifeContext JSON:
 ${args.contextJson}`;
 }
 

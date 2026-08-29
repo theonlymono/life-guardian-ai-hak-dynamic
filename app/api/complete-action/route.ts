@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       updatedContext: result.updatedContext,
       nextAction: result.nextAction,
       summary: result.summary,
+      simulation: result.simulation,
       questionsAnswered: result.questionsAnswered,
       questionsTotal: result.questionsTotal,
       assistantMessage: result.assistantMessage,

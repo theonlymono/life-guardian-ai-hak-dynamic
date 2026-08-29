@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       changesDetected: result.changesDetected,
       dailyAction: result.dailyAction,
       summary: result.summary,
+      simulation: result.simulation,
       questionsAnswered: result.questionsAnswered,
       questionsTotal: result.questionsTotal,
       assistantMessage: result.assistantMessage,

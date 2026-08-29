@@ -17,7 +17,15 @@ import {
 import { selectFallbackAction } from "@/lib/engagement/daily-action";
 import { fallbackSummary } from "@/lib/engagement/summary-fallback";
 import { hasNumericEvidence } from "@/lib/risk/engine";
-import { myanmarDigitsToLatin, parseMoney } from "@/lib/i18n/money";
+import {
+  currencyForUnit,
+  isMoneyUnit,
+  myanmarDigitsToLatin,
+  parseMoney,
+  unitMultiplier,
+} from "@/lib/i18n/money";
+import { contextCurrency, withUnitHint } from "@/lib/engagement/units";
+import { resolveGoalProgress } from "@/lib/simulation/resolve";
 import {
   completedTopicKeys,
   fallbackPressureQuestion,
@@ -96,7 +104,7 @@ export async function generateDailyAction(
     if (!parsed.success) {
       throw new Error("INVALID_AI_RESPONSE");
     }
-    const action = draftToAction(parsed.data, language);
+    const action = draftToAction(parsed.data, language, contextCurrency(context.commitments));
     const draftText = [
       action.title,
       action.reason,
@@ -154,6 +162,7 @@ export async function generateSummary(
       summaryUserPrompt({
         language,
         answeredCount: context.completedActions.length,
+        projection: projectionFacts(context),
         contextJson: JSON.stringify({
           profile: context.profile,
           lifeEvents: context.lifeEvents,
@@ -261,47 +270,55 @@ export function dropUnsupportedNumbers(
   };
 }
 
-/** Units we can state with certainty from the topic alone. */
-const TOPIC_UNITS: Record<string, Record<SupportedLanguage, string>> = {
-  months: { en: "months", my: "လ" },
-  years: { en: "years", my: "နှစ်" },
-  age: { en: "years old", my: "နှစ်" },
-  people: { en: "people", my: "ဦး" },
-  money: { en: "MMK", my: "သိန်း" },
-};
+/**
+ * Hands the closing summary the arithmetic instead of letting it do the sums.
+ * The model is good at explaining a gap and unreliable at computing one.
+ */
+function projectionFacts(context: LifeContext): string | undefined {
+  const simulation = resolveGoalProgress(context)?.simulation;
+  if (!simulation) return undefined;
 
-function unitForTopic(
-  topicKey: string,
-  language: SupportedLanguage,
-): string | undefined {
-  const key = topicKey.toLowerCase();
-  if (/month/.test(key)) return TOPIC_UNITS.months[language];
-  if (/age|retirement/.test(key)) return TOPIC_UNITS.age[language];
-  if (/year/.test(key)) return TOPIC_UNITS.years[language];
-  if (/dependents|children/.test(key)) return TOPIC_UNITS.people[language];
-  if (/saving|income|amount|cost|fund|debt|loan/.test(key)) return TOPIC_UNITS.money[language];
-  return undefined;
+  const { currency, targetAmount, currentAmount, monthlyContribution } = simulation;
+  const lines = [
+    `goal: ${simulation.goalKey}`,
+    `already saved: ${currentAmount} ${currency}`,
+    `target: ${targetAmount} ${currency}`,
+    `their pace: ${monthlyContribution} ${currency} per month for ${simulation.monthsRemaining} months`,
+    `projected total: ${simulation.projected} ${currency}`,
+  ];
+  lines.push(
+    simulation.onTrack
+      ? "outcome: their own pace reaches the target"
+      : `shortfall: ${simulation.gap} ${currency}; ${simulation.requiredMonthly} ${currency} per month closes it in time${
+          simulation.monthsAtCurrentPace
+            ? `, or the same pace needs ${simulation.monthsAtCurrentPace} months`
+            : ""
+        }`,
+  );
+  return lines.join("\n");
 }
 
-function draftToAction(draft: DailyActionDraft, language: SupportedLanguage): DailyAction {
-  const numeric = draft.actionType === "numeric_input";
-  const unitHint = numeric ? (draft.unitHint ?? unitForTopic(draft.topicKey, language)) : undefined;
-
-  return withActionId({
-    focus: draft.focus,
-    title: draft.title,
-    reason: draft.reason,
-    // A number with no unit cannot be read back safely, and guessing the scale
-    // is how a "3" becomes 300,000. If we cannot name the unit, let the
-    // customer write it themselves.
-    actionType: numeric && !unitHint ? "text_question" : draft.actionType,
-    question: draft.question,
-    options: draft.options,
-    unitHint,
-    estimatedMinutes: draft.estimatedMinutes,
-    expectedImpact: draft.expectedImpact,
-    topicKey: draft.topicKey,
-  });
+function draftToAction(
+  draft: DailyActionDraft,
+  language: SupportedLanguage,
+  currency: string,
+): DailyAction {
+  return withUnitHint(
+    withActionId({
+      focus: draft.focus,
+      title: draft.title,
+      reason: draft.reason,
+      actionType: draft.actionType,
+      question: draft.question,
+      options: draft.options,
+      unitHint: draft.unitHint,
+      estimatedMinutes: draft.estimatedMinutes,
+      expectedImpact: draft.expectedImpact,
+      topicKey: draft.topicKey,
+    }),
+    language,
+    currency,
+  );
 }
 
 function fallbackAssistantMessage(action: DailyAction, language: SupportedLanguage): string {
@@ -346,6 +363,49 @@ export function isCleanForLanguage(text: string, language: SupportedLanguage): b
   if (hasForeignScript(text, language)) return false;
   if (language === "my" && LATIN_WORD_LEAK.test(text)) return false;
   return true;
+}
+
+/**
+ * Reads a numeric answer without asking a model anything.
+ *
+ * When the field showed a unit and the topic is known, the arithmetic is not a
+ * judgement call: "3" under a သိန်း label is 300,000, filed against that topic.
+ * Routing it through the model only creates a chance for the scale to drift,
+ * and every figure a projection is built on has to be exactly what was typed.
+ */
+export function numericInterpretation(args: {
+  answer: string | number | boolean;
+  topicKey?: string;
+  unitHint?: string;
+  currency?: string;
+}): AnswerInterpretation | undefined {
+  if (!args.topicKey || !args.unitHint) return undefined;
+
+  const raw = myanmarDigitsToLatin(String(args.answer)).replace(/,/g, "");
+  const match = raw.match(/^\s*(\d+(?:\.\d+)?)\s*$/);
+  if (!match) return undefined;
+
+  const value = Number(match[1]) * unitMultiplier(args.unitHint);
+  const money = isMoneyUnit(args.unitHint);
+
+  return {
+    interpretedAnswer: value,
+    profileUpdates: {},
+    newLifeEvents: [],
+    newCommitments: money
+      ? [
+          {
+            type: args.topicKey,
+            amount: value,
+            currency: currencyForUnit(args.unitHint, args.currency ?? "MMK"),
+            description: "Stated by the customer",
+          },
+        ]
+      : [],
+    resolvedUnknowns: [args.topicKey],
+    newlyUnknown: [],
+    notes: `Read as ${value} from "${String(args.answer)}" ${args.unitHint}.`,
+  };
 }
 
 function heuristicInterpretation(args: {

@@ -8,6 +8,7 @@ import type {
   RiskScore,
   SupportedLanguage,
 } from "@/lib/types/life-context";
+import type { GoalSimulation } from "@/lib/simulation/goal";
 
 export type ApiErrorCode =
   | "INVALID_REQUEST"
@@ -40,6 +41,12 @@ export interface EngagementProgress {
   questionsAnswered: number;
   questionsTotal: number;
   summary: LifeSummary | null;
+  /**
+   * Present once the customer has stated a target, a starting amount and a
+   * monthly pace for a dated goal. Every figure in it is theirs; the client may
+   * re-run it locally to answer "what if I save less".
+   */
+  simulation: GoalSimulation | null;
 }
 
 export interface AnalyzeResponse extends EngagementProgress {

@@ -39,6 +39,52 @@ export function toMyanmarDigits(text: string): string {
   return text.replace(/\d/g, (digit) => MYANMAR_DIGITS[Number(digit)]);
 }
 
+const UNIT_MULTIPLIERS: Record<string, number> = {
+  သိန်း: 100_000,
+  သန်း: 1_000_000,
+  ကုဋေ: 10_000_000,
+  သောင်း: 10_000,
+  lakh: 100_000,
+  lakhs: 100_000,
+  million: 1_000_000,
+};
+
+/**
+ * What a bare number means once the unit shown beside the field is applied.
+ * A customer answering "3" under a သိန်း label means 300,000.
+ */
+export function unitMultiplier(unitHint: string | undefined): number {
+  if (!unitHint) return 1;
+  return UNIT_MULTIPLIERS[unitHint.trim().toLowerCase()] ?? 1;
+}
+
+export function isMoneyUnit(unitHint: string | undefined): boolean {
+  if (!unitHint) return false;
+  const unit = unitHint.trim();
+  if (unit in UNIT_MULTIPLIERS || unit.toLowerCase() in UNIT_MULTIPLIERS) return true;
+  return /^(mmk|jpy|usd|ကျပ်)$/i.test(unit);
+}
+
+/** The currency a unit label implies, when it implies one at all. */
+export function currencyForUnit(unitHint: string | undefined, fallback = "MMK"): string | undefined {
+  if (!isMoneyUnit(unitHint)) return undefined;
+  const unit = (unitHint ?? "").trim();
+  if (/^(mmk|jpy|usd)$/i.test(unit)) return unit.toUpperCase();
+  return fallback;
+}
+
+/**
+ * The unit a customer should type an amount in.
+ *
+ * Kyat is counted in သိန်း here and in lakh in Myanmar English — the same
+ * hundred thousand either way. Asking anyone to type 15000000 invites a lost
+ * zero. Other currencies are entered in full, having no such convention.
+ */
+export function moneyUnit(currency: string, language: SupportedLanguage): string {
+  if (currency !== "MMK") return currency;
+  return language === "my" ? "သိန်း" : "lakh";
+}
+
 export interface ParsedMoney {
   amount: number;
   currency?: string;

@@ -364,6 +364,7 @@ Returns HTTP 200. A missing webhook URL, an unpublished workflow, or a failed Mo
 1. Keep `LifeContext` in client state (or localStorage). Send it back on later calls.
 2. Language switching does not change scores or category keys — only human-readable strings.
 3. After `complete-action`, replace stored context with `updatedContext`, then render `nextAction` if it is present or `summary` if it is not. Show `questionsAnswered` / `questionsTotal` so the customer can see the loop is finite.
-4. Render `action.unitHint` beside a `numeric_input` field and send the bare number. `commitment.amount` is always whole currency units — format it with `formatMoney` from `lib/i18n/money.ts`, which writes kyat as သိန်း for Burmese readers. Never convert between currencies.
-5. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
-6. Optional: after every turn, call `/api/log-turn` in the background. Never await it or surface `stored: false`.
+4. `simulation` appears once the customer has stated a starting amount, a target and a monthly pace for a dated goal, and stays present on later turns. Amounts are whole currency units; `scenarios` covers their pace, the pace that closes the gap in time, and the same pace over more months. To answer "what if I save less", call `simulateGoal` from `lib/simulation/goal.ts` in the browser with a different `monthlyContribution` — it is pure arithmetic and nothing needs saving.
+5. Render `action.unitHint` beside a `numeric_input` field and send the bare number. `commitment.amount` is always whole currency units — format it with `formatMoney` from `lib/i18n/money.ts`, which writes kyat as သိန်း for Burmese readers. Never convert between currencies.
+6. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
+7. Optional: after every turn, call `/api/log-turn` in the background. Never await it or surface `stored: false`.

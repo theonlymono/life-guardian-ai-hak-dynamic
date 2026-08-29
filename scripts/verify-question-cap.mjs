@@ -65,7 +65,12 @@ console.log(`\n=== Engagement cap check (${language}) ===\n`);
 let result = await post("/api/analyze", { language, input: STORY[language] });
 const total = result.questionsTotal;
 line("cap", total);
-line("Q1", result.dailyAction?.question ?? "(none)");
+line(
+  "Q1",
+  result.dailyAction
+    ? `${result.dailyAction.question}${result.dailyAction.unitHint ? `  [${result.dailyAction.unitHint}]` : ""}`
+    : "(none)",
+);
 
 let asked = 1;
 let context = result.context;

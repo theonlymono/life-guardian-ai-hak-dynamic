@@ -26,6 +26,7 @@ import type {
   RiskLevel,
   SupportedLanguage,
 } from "@/lib/types/life-context"
+import type { GoalSimulation } from "@/lib/simulation/goal"
 
 export type TurnKind = "analyze" | "answer" | "update"
 
@@ -69,6 +70,7 @@ interface SessionValue {
   context: LifeContext | null
   currentAction: DailyAction | null
   summary: LifeSummary | null
+  simulation: GoalSimulation | null
   questionsAnswered: number
   questionsTotal: number
   turns: Turn[]
@@ -130,6 +132,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [context, setContext] = useState<LifeContext | null>(null)
   const [currentAction, setCurrentAction] = useState<DailyAction | null>(null)
   const [summary, setSummary] = useState<LifeSummary | null>(null)
+  const [simulation, setSimulation] = useState<GoalSimulation | null>(null)
   const [progress, setProgress] = useState({ answered: 0, total: 5 })
   const [turns, setTurns] = useState<Turn[]>([])
   const [title, setTitle] = useState<string | null>(null)
@@ -236,6 +239,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setContext(null)
     setCurrentAction(null)
     setSummary(null)
+    setSimulation(null)
     setProgress({ answered: 0, total: 5 })
     setTurns([])
     setTitle(null)
@@ -286,6 +290,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setContext(next)
         setCurrentAction(data.dailyAction)
         setSummary(data.summary)
+        setSimulation(data.simulation)
         setProgress({ answered: data.questionsAnswered, total: data.questionsTotal })
         setSource(data.source)
         archiveTurn({
@@ -337,6 +342,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setContext(data.updatedContext)
         setCurrentAction(data.nextAction)
         setSummary(data.summary)
+        setSimulation(data.simulation)
         setProgress({ answered: data.questionsAnswered, total: data.questionsTotal })
         setSource(data.source)
         archiveTurn({
@@ -383,6 +389,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       context,
       currentAction,
       summary,
+      simulation,
       questionsAnswered: progress.answered,
       questionsTotal: progress.total,
       turns,
@@ -405,6 +412,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       context,
       currentAction,
       summary,
+      simulation,
       progress,
       turns,
       title,

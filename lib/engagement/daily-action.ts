@@ -5,6 +5,7 @@ import {
   isRepeatedQuestion,
   withActionId,
 } from "@/lib/engagement/repetition";
+import { contextCurrency, withUnitHint } from "@/lib/engagement/units";
 
 export function selectFallbackAction(
   context: LifeContext,
@@ -22,7 +23,8 @@ export function selectFallbackAction(
   const candidates = fallbackCatalog(context, language).filter(
     (action) => !blocked.has((action.topicKey ?? "").toLowerCase()) && !isRepeatedQuestion(action, context),
   );
-  return candidates[0] ?? fallbackPressureQuestion(language);
+  const currency = contextCurrency(context.commitments);
+  return withUnitHint(candidates[0] ?? fallbackPressureQuestion(language), language, currency);
 }
 
 function fallbackCatalog(context: LifeContext, language: SupportedLanguage): DailyAction[] {

@@ -12,6 +12,7 @@ import {
 import type { RiskLevel } from "@/lib/types/life-context"
 import { ActionCard } from "./action-card"
 import { SummaryCard } from "./summary-card"
+import { SimulationCard } from "./simulation-card"
 import { CATEGORY_LABELS, t } from "./copy"
 import { TURN_STEPS, useSession, type RiskMove, type Turn } from "./session-provider"
 
@@ -23,7 +24,8 @@ const MOVE_TEXT: Record<RiskLevel, string> = {
 }
 
 export function Conversation() {
-  const { turns, currentAction, summary, loading, error, source, language } = useSession()
+  const { turns, currentAction, summary, simulation, loading, error, source, language } =
+    useSession()
   const copy = t(language)
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -46,6 +48,9 @@ export function Conversation() {
 
         {!loading && currentAction && <ActionCard />}
         {!loading && !currentAction && summary && <SummaryCard />}
+        {/* The projection outlives any single question: it stays visible while
+            the remaining questions are asked and under the closing summary. */}
+        {!loading && simulation && <SimulationCard />}
 
         {error && (
           <div className="rounded-xl border border-red-500/25 bg-red-500/5 px-4 py-2.5 text-sm text-red-700">
