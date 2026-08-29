@@ -3,4 +3,6 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Next 16 needs >= 20.9 and the mongodb driver >= 20.19. Pinning to 22 keeps
+  # a margin over both rather than depending on where "20" happens to resolve.
+  NODE_VERSION = "22"
