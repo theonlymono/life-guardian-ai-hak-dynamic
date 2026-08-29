@@ -11,7 +11,7 @@ import {
   IdeaIcon,
   Clock01Icon,
 } from "@hugeicons/core-free-icons"
-import { PerplexityMark } from "./perplexity-logo"
+import { LifeGuardianMark } from "./perplexity-logo"
 import { useSession, type PanelKey } from "@/components/life-guardian/session-provider"
 import { t } from "@/components/life-guardian/copy"
 
@@ -49,8 +49,12 @@ export function AppSidebar() {
 
   return (
     <aside className="flex h-screen w-[240px] shrink-0 flex-col border-r border-border/60 bg-[#f7f8f9]">
-      <div className="flex h-14 items-center px-4">
-        <PerplexityMark className="size-6 text-foreground" />
+      <div className="flex h-14 items-center gap-2 px-4">
+        <LifeGuardianMark size={24} className="shrink-0" />
+        {/* The product name stays Latin in both languages, so it never reflows. */}
+        <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">
+          Life Guardian <span className="text-[#0084ff]">AI</span>
+        </span>
       </div>
 
       <div className="px-3 pb-2">

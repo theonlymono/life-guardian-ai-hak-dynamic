@@ -19,14 +19,10 @@ export function PerplexityLogo({
           textSize
         )}
       >
-        Life Guardian
+        Life Guardian <span className="text-[#0084ff]">AI</span>
       </span>
     </div>
   )
-}
-
-export function PerplexityMark({ className }: { className?: string }) {
-  return <LifeGuardianMark className={className} size={24} />
 }
 
 export function LifeGuardianMark({
