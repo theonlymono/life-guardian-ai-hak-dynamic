@@ -2,6 +2,7 @@ import { analyzeRequestSchema } from "@/lib/ai/schemas";
 import { runAnalyze } from "@/lib/ai/pipeline";
 import { errorResponse, json, languageFromUnknown, readJson } from "@/lib/api/http";
 import { resolveLanguage } from "@/lib/i18n/language";
+import type { AnalyzeResponse } from "@/lib/types/api";
 
 export async function POST(request: Request) {
   const body = await readJson(request);
@@ -24,14 +25,18 @@ export async function POST(request: Request) {
       resolved,
       parsed.data.existingContext,
     );
-    return json({
+    const body: AnalyzeResponse = {
       success: true,
       language: resolved,
       context: result.context,
       dailyAction: result.dailyAction,
+      summary: result.summary,
+      questionsAnswered: result.questionsAnswered,
+      questionsTotal: result.questionsTotal,
       assistantMessage: result.assistantMessage,
       source: result.source,
-    });
+    };
+    return json(body);
   } catch (error) {
     const code =
       error instanceof Error && error.message === "AI_NOT_CONFIGURED"

@@ -304,20 +304,28 @@ function parseMonths(answer: string): number | undefined {
   return bare ? Number(bare[1]) : undefined;
 }
 
+const CATEGORY_LABELS = {
+  finance: { en: "Finance", my: "ငွေကြေး" },
+  family: { en: "Family", my: "မိသားစု" },
+  healthCare: { en: "Health/Care", my: "ကျန်းမာရေး/စောင့်ရှောက်မှု" },
+  education: { en: "Education", my: "ပညာရေး" },
+  housing: { en: "Housing", my: "နေထိုင်မှု" },
+} as const;
+
+export function categoryLabel(
+  category: (typeof RISK_CATEGORIES)[number],
+  language: SupportedLanguage,
+): string {
+  return CATEGORY_LABELS[category][language];
+}
+
 function explanationFor(
   category: (typeof RISK_CATEGORIES)[number],
   score: number,
   factors: string[],
   language: SupportedLanguage,
 ): string {
-  const labels = {
-    finance: { en: "Finance", my: "ငွေကြေး" },
-    family: { en: "Family", my: "မိသားစု" },
-    healthCare: { en: "Health/Care", my: "ကျန်းမာရေး/စောင့်ရှောက်မှု" },
-    education: { en: "Education", my: "ပညာရေး" },
-    housing: { en: "Housing", my: "နေထိုင်မှု" },
-  } as const;
-  const label = labels[category][language];
+  const label = categoryLabel(category, language);
   if (factors.length === 0) {
     return language === "my"
       ? `${label} အတွက် အရေးပေါ်ဦးစားပေးမှု သိသိသာသာ မတွေ့ရသေးပါဘူး။ ဒီဂဏန်းက မလုံခြုံမှု ရာခိုင်နှုန်း မဟုတ်ပါဘူး။`

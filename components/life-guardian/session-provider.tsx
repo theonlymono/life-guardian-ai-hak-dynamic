@@ -21,6 +21,7 @@ import type {
 import type {
   DailyAction,
   LifeContext,
+  LifeSummary,
   RiskCategory,
   RiskLevel,
   SupportedLanguage,
@@ -67,6 +68,9 @@ interface SessionValue {
   togglePanel: (key: PanelKey) => void
   context: LifeContext | null
   currentAction: DailyAction | null
+  summary: LifeSummary | null
+  questionsAnswered: number
+  questionsTotal: number
   turns: Turn[]
   title: string | null
   loading: boolean
@@ -125,6 +129,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<SupportedLanguage>("en")
   const [context, setContext] = useState<LifeContext | null>(null)
   const [currentAction, setCurrentAction] = useState<DailyAction | null>(null)
+  const [summary, setSummary] = useState<LifeSummary | null>(null)
+  const [progress, setProgress] = useState({ answered: 0, total: 5 })
   const [turns, setTurns] = useState<Turn[]>([])
   const [title, setTitle] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -184,6 +190,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       userText: string
       assistantText: string
       action: DailyAction | null
+      summary?: LifeSummary | null
       context: LifeContext
       riskMoves: RiskMove[]
     }) => {
@@ -192,7 +199,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         language,
         kind: args.kind,
         userText: args.userText,
-        assistantText: args.assistantText,
+        // The closing turn's real content lives in the summary card, so the
+        // archive would otherwise store only the lead-in sentence.
+        assistantText: args.summary
+          ? [
+              args.assistantText,
+              args.summary.headline,
+              args.summary.situation,
+              ...args.summary.priorities.map((item) => `${item.focus}: ${item.why}`),
+              args.summary.nextStep,
+            ].join("\n\n")
+          : args.assistantText,
         action: args.action
           ? {
               focus: args.action.focus,
@@ -214,6 +231,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => {
     setContext(null)
     setCurrentAction(null)
+    setSummary(null)
+    setProgress({ answered: 0, total: 5 })
     setTurns([])
     setTitle(null)
     setError(null)
@@ -262,12 +281,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
         setContext(next)
         setCurrentAction(data.dailyAction)
+        setSummary(data.summary)
+        setProgress({ answered: data.questionsAnswered, total: data.questionsTotal })
         setSource(data.source)
         archiveTurn({
           kind: isFirst ? "analyze" : "update",
           userText: trimmed,
           assistantText: data.assistantMessage,
           action: data.dailyAction,
+          summary: data.summary,
           context: next,
           riskMoves,
         })
@@ -310,12 +332,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
         setContext(data.updatedContext)
         setCurrentAction(data.nextAction)
+        setSummary(data.summary)
+        setProgress({ answered: data.questionsAnswered, total: data.questionsTotal })
         setSource(data.source)
         archiveTurn({
           kind: "answer",
           userText: String(answer),
           assistantText: data.assistantMessage,
           action: data.nextAction,
+          summary: data.summary,
           context: data.updatedContext,
           riskMoves,
         })
@@ -353,6 +378,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       togglePanel,
       context,
       currentAction,
+      summary,
+      questionsAnswered: progress.answered,
+      questionsTotal: progress.total,
       turns,
       title,
       loading,
@@ -372,6 +400,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       togglePanel,
       context,
       currentAction,
+      summary,
+      progress,
       turns,
       title,
       loading,

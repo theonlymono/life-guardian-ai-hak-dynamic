@@ -81,11 +81,16 @@ Initial life-story analysis.
     "expectedImpact": "Shows whether education planning needs attention this week.",
     "topicKey": "education_savings"
   },
+  "summary": null,
+  "questionsAnswered": 0,
+  "questionsTotal": 5,
   "assistantMessage": "Based on what you shared, one useful next step today is..."
 }
 ```
 
 `source` is `"live_ai"` or `"demo_backup"`. Demo backup is never presented as live AI.
+
+See [The engagement loop ends](#the-engagement-loop-ends) for `summary`, `questionsAnswered`, and `questionsTotal`.
 
 ### Error
 
@@ -103,7 +108,7 @@ Initial life-story analysis.
 
 ## POST `/api/complete-action`
 
-Stores the answer, updates context, and returns a **different** next action.
+Stores the answer, updates context, and returns a **different** next action — or, once the question limit is reached, `nextAction: null` and a `summary`.
 
 ### Request
 
@@ -132,6 +137,9 @@ Stores the answer, updates context, and returns a **different** next action.
     "question": "Approximately how many months of essential expenses could your current savings cover?",
     "topicKey": "emergency_fund_months"
   },
+  "summary": null,
+  "questionsAnswered": 1,
+  "questionsTotal": 5,
   "assistantMessage": "..."
 }
 ```
@@ -139,6 +147,47 @@ Stores the answer, updates context, and returns a **different** next action.
 ### Error
 
 Same standard error object. Action completion still succeeds in the product even if n8n later fails.
+
+---
+
+## The engagement loop ends
+
+`/api/analyze`, `/api/complete-action` and `/api/life-update` all carry the same three fields. An assistant that answers every answer with another question never feels like it arrives anywhere, so the loop stops asking after `questionsTotal` (currently **5**) answers and reports back instead.
+
+| Field | Meaning |
+| --- | --- |
+| `questionsAnswered` | Answers recorded so far, equal to `context.completedActions.length` |
+| `questionsTotal` | The cap. Constant per deployment; read it rather than hardcoding 5 |
+| `summary` | `null` while questions remain; the closing readout once the cap is reached |
+
+While `questionsAnswered < questionsTotal`: the action field is populated and `summary` is `null`.
+
+At the cap: the action field is `null` and `summary` is populated. The two are never both present, so the client can branch on either one.
+
+```json
+{
+  "success": true,
+  "nextAction": null,
+  "questionsAnswered": 5,
+  "questionsTotal": 5,
+  "assistantMessage": "That is everything I need to ask. Here is what your answers add up to.",
+  "summary": {
+    "headline": "Balancing single income stability with upcoming education and care milestones",
+    "situation": "Your household relies on a single income while managing a remaining mortgage of 35,000,000 JPY...",
+    "priorities": [
+      {
+        "focus": "Financial resilience and emergency savings",
+        "why": "Your current savings cover fewer than three months of essentials..."
+      }
+    ],
+    "nextStep": "It is worth considering building a dedicated emergency buffer..."
+  }
+}
+```
+
+After the cap the customer can still send `/api/life-update`. New information regenerates the summary rather than reopening the questions.
+
+If the model is unavailable or rate-limited, the summary is built deterministically from the risk engine instead, so this response never fails to arrive. Localized the same way as everything else: `focus` values are human-readable labels here, not the `RiskCategory` enum.
 
 ---
 
@@ -165,6 +214,9 @@ Merges a new natural-language update into existing context. Does not erase previ
   "updatedContext": {},
   "changesDetected": ["lifeEvent:elder_care"],
   "dailyAction": {},
+  "summary": null,
+  "questionsAnswered": 2,
+  "questionsTotal": 5,
   "assistantMessage": "..."
 }
 ```
@@ -299,6 +351,6 @@ Returns HTTP 200. A missing webhook URL, an unpublished workflow, or a failed Mo
 
 1. Keep `LifeContext` in client state (or localStorage). Send it back on later calls.
 2. Language switching does not change scores or category keys — only human-readable strings.
-3. After `complete-action`, replace stored context with `updatedContext` and render `nextAction`.
+3. After `complete-action`, replace stored context with `updatedContext`, then render `nextAction` if it is present or `summary` if it is not. Show `questionsAnswered` / `questionsTotal` so the customer can see the loop is finite.
 4. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
 5. Optional: after every turn, call `/api/log-turn` in the background. Never await it or surface `stored: false`.

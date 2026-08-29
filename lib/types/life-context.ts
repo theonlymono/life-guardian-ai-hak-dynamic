@@ -69,6 +69,17 @@ export interface DailyAction {
   topicKey?: string;
 }
 
+/**
+ * The readout delivered once the engagement loop stops asking questions.
+ * Every field is human-readable and follows the requested language.
+ */
+export interface LifeSummary {
+  headline: string;
+  situation: string;
+  priorities: { focus: string; why: string }[];
+  nextStep: string;
+}
+
 export interface LifeContext {
   profile: UserProfile;
   lifeEvents: LifeEvent[];

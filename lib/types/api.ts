@@ -2,6 +2,7 @@ import type {
   CompletedAction,
   DailyAction,
   LifeContext,
+  LifeSummary,
   RiskCategory,
   RiskLevel,
   RiskScore,
@@ -30,11 +31,22 @@ export interface AnalyzeRequest {
   existingContext?: LifeContext | null;
 }
 
-export interface AnalyzeResponse {
+/**
+ * Present on every response that can advance the loop. Once `questionsAnswered`
+ * reaches `questionsTotal` the action is null and `summary` carries the
+ * closing readout instead.
+ */
+export interface EngagementProgress {
+  questionsAnswered: number;
+  questionsTotal: number;
+  summary: LifeSummary | null;
+}
+
+export interface AnalyzeResponse extends EngagementProgress {
   success: true;
   language: SupportedLanguage;
   context: LifeContext;
-  dailyAction: DailyAction;
+  dailyAction: DailyAction | null;
   assistantMessage: string;
   source: "live_ai" | "demo_backup";
 }
@@ -46,11 +58,11 @@ export interface CompleteActionRequest {
   answer: string | number | boolean;
 }
 
-export interface CompleteActionResponse {
+export interface CompleteActionResponse extends EngagementProgress {
   success: true;
   language: SupportedLanguage;
   updatedContext: LifeContext;
-  nextAction: DailyAction;
+  nextAction: DailyAction | null;
   assistantMessage: string;
   source: "live_ai" | "demo_backup";
 }
@@ -61,12 +73,12 @@ export interface LifeUpdateRequest {
   context: LifeContext;
 }
 
-export interface LifeUpdateResponse {
+export interface LifeUpdateResponse extends EngagementProgress {
   success: true;
   language: SupportedLanguage;
   updatedContext: LifeContext;
   changesDetected: string[];
-  dailyAction: DailyAction;
+  dailyAction: DailyAction | null;
   assistantMessage: string;
   source: "live_ai" | "demo_backup";
 }

@@ -160,6 +160,21 @@ export const followUpRequestSchema = z.object({
   nextAction: dailyActionSchema.optional(),
 });
 
+export const lifeSummarySchema = z.object({
+  headline: z.string().min(1).max(300),
+  situation: z.string().min(1).max(2000),
+  priorities: z
+    .array(
+      z.object({
+        focus: z.string().min(1).max(200),
+        why: z.string().min(1).max(800),
+      }),
+    )
+    .min(1)
+    .max(4),
+  nextStep: z.string().min(1).max(1000),
+});
+
 export const chatLogRequestSchema = z.object({
   sessionId: z.string().trim().min(1).max(200),
   language: supportedLanguageSchema.optional(),
