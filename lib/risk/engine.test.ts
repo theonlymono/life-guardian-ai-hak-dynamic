@@ -14,6 +14,45 @@ test("time horizons written as words parse like digits", () => {
   assert.equal(parseYearHorizon("soon"), 0);
 });
 
+test("the same emergency-fund answer scores the same in English and Myanmar", () => {
+  const answers = ["1", 1, "About one month", "တစ်လစာလောက်ပဲ ရှိပါတယ်", "၁ လ"];
+
+  for (const answer of answers) {
+    const matched = detectMatchedRules({
+      ...emptyLifeContext(),
+      completedActions: [
+        {
+          actionId: "a1",
+          focus: "Emergency Fund",
+          question: "How many months of essential expenses could your savings cover?",
+          answer,
+          topicKey: "emergency_fund_months",
+          completedAt: new Date().toISOString(),
+        },
+      ],
+    });
+    assert.ok(
+      matched.has("emergency_savings_under_3_months"),
+      `expected the under-3-months rule to fire for ${JSON.stringify(answer)}`,
+    );
+  }
+
+  const comfortable = detectMatchedRules({
+    ...emptyLifeContext(),
+    completedActions: [
+      {
+        actionId: "a2",
+        focus: "Emergency Fund",
+        question: "How many months of essential expenses could your savings cover?",
+        answer: "ခြောက်လ",
+        topicKey: "emergency_fund_months",
+        completedAt: new Date().toISOString(),
+      },
+    ],
+  });
+  assert.ok(!comfortable.has("emergency_savings_under_3_months"));
+});
+
 test("risk level boundaries", () => {
   assert.equal(riskLevelFromScore(0), "LOW");
   assert.equal(riskLevelFromScore(29), "LOW");

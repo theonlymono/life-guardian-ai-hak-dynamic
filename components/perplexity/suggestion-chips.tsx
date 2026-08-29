@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Presentation01Icon,
-  Analytics01Icon,
-  PaintBoardIcon,
+  UserGroupIcon,
+  MortarboardIcon,
+  Home01Icon,
   ShuffleIcon,
 } from "@hugeicons/core-free-icons"
 import { useSession } from "@/components/life-guardian/session-provider"
@@ -15,7 +15,7 @@ interface Suggestion {
   label: Record<SupportedLanguage, string>
   /** Seeded into the prompt so a demo can start without typing a whole story. */
   prompt: Record<SupportedLanguage, string>
-  icon: typeof Presentation01Icon
+  icon: typeof UserGroupIcon
 }
 
 const suggestions: Suggestion[] = [
@@ -28,7 +28,7 @@ const suggestions: Suggestion[] = [
       en: "I'm 42. My wife isn't working. We have two children. We still have a 35 million yen mortgage. My father is 78 and may need care soon. My oldest son starts university in two years.",
       my: "ကျွန်တော် အသက် ၄၂ နှစ်ရှိပါပြီ။ ဇနီးက အခုအလုပ်မလုပ်ပါဘူး။ ကလေးနှစ်ယောက်ရှိပါတယ်။ အိမ်ချေးငွေ ယန်း ၃၅ သန်းလောက်ကျန်သေးတယ်။ အဖေက အသက် ၇၈ နှစ်ရှိပြီး မကြာခင် စောင့်ရှောက်မှုလိုလာနိုင်ပါတယ်။ အကြီးဆုံးသားက နောက်နှစ်နှစ်အတွင်း တက္ကသိုလ်တက်တော့မှာပါ။",
     },
-    icon: Presentation01Icon,
+    icon: UserGroupIcon,
   },
   {
     label: {
@@ -39,7 +39,7 @@ const suggestions: Suggestion[] = [
       en: "My oldest child starts university in two years and I want to be ready for the cost.",
       my: "အကြီးဆုံးကလေးက နောက်နှစ်နှစ်အတွင်း တက္ကသိုလ်တက်မှာဖြစ်လို့ ကုန်ကျစရိတ်အတွက် ပြင်ဆင်ထားချင်ပါတယ်။",
     },
-    icon: Analytics01Icon,
+    icon: MortarboardIcon,
   },
   {
     label: {
@@ -50,7 +50,7 @@ const suggestions: Suggestion[] = [
       en: "I still have a large mortgage and I am worried about keeping up with it.",
       my: "အိမ်ချေးငွေ အများကြီး ကျန်နေသေးလို့ ဆက်ပြီး ပေးဆပ်နိုင်ပါ့မလား စိုးရိမ်နေပါတယ်။",
     },
-    icon: PaintBoardIcon,
+    icon: Home01Icon,
   },
 ]
 

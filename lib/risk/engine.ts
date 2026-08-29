@@ -290,10 +290,18 @@ function myanmarToNumber(value: string): number {
   return Number([...value].map((char) => map[char] ?? char).join(""));
 }
 
+/**
+ * "About one month" and "တစ်လစာ" mean the same thing, so they must produce the
+ * same score. Reading only Latin digits here made the emergency-fund rule fire
+ * in English but not in Myanmar.
+ */
 function parseMonths(answer: string): number | undefined {
-  const match = answer.match(/(\d+(?:\.\d+)?)/);
-  if (!match) return undefined;
-  return Number(match[1]);
+  const withUnit = matchQuantity(answer, "months?|mos?", "လ");
+  if (withUnit !== undefined) return withUnit;
+
+  // The question asks for a month count, so a bare number is already months.
+  const bare = myanmarDigitsToLatin(answer).match(/(\d+(?:\.\d+)?)/);
+  return bare ? Number(bare[1]) : undefined;
 }
 
 function explanationFor(

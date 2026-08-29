@@ -60,7 +60,16 @@ JSON schema:
 
 topicKey must be a stable English snake_case key such as education_savings, emergency_fund_months, elder_care_shared, retirement_age, current_pressure.
 Keep category/technical meaning stable even when language is Myanmar.
-assistantMessage should feel like a companion: understand, prioritize, then ask one useful next step.
+
+assistantMessage must get to the point. Write 2-3 short sentences in this order:
+1. State the specific finding — what their latest answer or story actually means for them. If a risk level moved, say which one and why it moved.
+2. Connect the facts to each other. "One income now carries a mortgage, two children and a university bill two years away" is useful; repeating their sentence back is not.
+3. Close with a half-sentence pointing at the action.
+
+Never restate the question inside assistantMessage — the action card already shows it.
+Never open with filler such as "It sounds like you are carrying a lot" or "Thank you for sharing".
+Never list several things they should do. There is exactly one action.
+reason must explain why THIS action matters more than the alternatives right now, not what the action is.
 
 Language rules for title, reason, question, options, expectedImpact, and assistantMessage:
 - Write them ENTIRELY in the requested language. Never mix two languages in one sentence.
@@ -75,7 +84,14 @@ export function actionUserPrompt(args: {
   blockedQuestions: string[];
 }): string {
   const languageName = args.language === "my" ? "Myanmar (Burmese)" : "English";
+  const answered = args.blockedTopics.length;
+  const depth =
+    answered === 0
+      ? "This is their first answer. Say what their story adds up to before asking anything."
+      : `They have already answered ${answered} question(s). Lead with what those answers now tell you about their position, then ask the next one.`;
+
   return `Language: ${args.language} — write every human-readable field in ${languageName} only.
+${depth}
 Blocked topicKeys: ${JSON.stringify(args.blockedTopics)}
 Already asked questions: ${JSON.stringify(args.blockedQuestions)}
 LifeContext JSON:
@@ -97,7 +113,9 @@ Respond with JSON only.
   "notes": string
 }
 
-If the user states ¥1.5 million, amount=1500000 and currency="JPY".`;
+If the user states ¥1.5 million, amount=1500000 and currency="JPY".
+
+interpretedAnswer must be a number whenever the question asks for a quantity — a count of months, years, people, or an amount — no matter which language the answer is written in. "About one month", "တစ်လစာလောက်ပဲ ရှိပါတယ်" and "၁ လ" all become the number 1. Only fall back to a string when the answer genuinely is not a quantity.`;
 
 export function interpretUserPrompt(args: {
   language: SupportedLanguage;

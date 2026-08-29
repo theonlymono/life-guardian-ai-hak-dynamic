@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -19,28 +20,54 @@ import type {
 import type {
   DailyAction,
   LifeContext,
+  RiskCategory,
+  RiskLevel,
   SupportedLanguage,
 } from "@/lib/types/life-context"
 
-export type SessionView = "today" | "pulse" | "actions" | "history"
+export type TurnKind = "analyze" | "answer" | "update"
 
-export interface ThreadItem {
+/** Step keys are fixed per turn kind so both languages render the same rows. */
+export const TURN_STEPS: Record<TurnKind, readonly StepKey[]> = {
+  analyze: ["stepRead", "stepRisk", "stepAction"],
+  answer: ["stepUnderstand", "stepRisk", "stepAction"],
+  update: ["stepMerge", "stepRisk", "stepAction"],
+} as const
+
+export type StepKey = "stepRead" | "stepUnderstand" | "stepMerge" | "stepRisk" | "stepAction"
+
+export interface RiskMove {
+  category: RiskCategory
+  fromLevel: RiskLevel
+  toLevel: RiskLevel
+  fromScore: number
+  toScore: number
+}
+
+export interface Turn {
   id: string
-  role: "assistant" | "user"
-  text: string
+  kind: TurnKind
+  userText: string
+  assistantText: string | null
+  riskMoves: RiskMove[]
+  changes: string[]
+  pending: boolean
+  failed: boolean
 }
 
 export type FollowUpStatus = "idle" | "pending" | "scheduled" | "unavailable"
 
+export type PanelKey = "pulse" | "known" | "actions"
+
 interface SessionValue {
   language: SupportedLanguage
   setLanguage: (language: SupportedLanguage) => void
-  view: SessionView
-  setView: (view: SessionView) => void
+  openPanels: Record<PanelKey, boolean>
+  togglePanel: (key: PanelKey) => void
   context: LifeContext | null
   currentAction: DailyAction | null
-  thread: ThreadItem[]
-  changesDetected: string[]
+  turns: Turn[]
+  title: string | null
   loading: boolean
   error: string | null
   followUpStatus: FollowUpStatus
@@ -75,35 +102,86 @@ async function postJson<T>(path: string, body: unknown): Promise<T | ApiErrorBod
   return (await response.json()) as T | ApiErrorBody
 }
 
+/** Surfacing what a score did is the point of the loop, so diff it every turn. */
+function diffRisks(before: LifeContext | null, after: LifeContext): RiskMove[] {
+  if (!before) return []
+  const moves: RiskMove[] = []
+  for (const risk of after.risks) {
+    const previous = before.risks.find((item) => item.category === risk.category)
+    if (!previous || previous.score === risk.score) continue
+    moves.push({
+      category: risk.category,
+      fromLevel: previous.level,
+      toLevel: risk.level,
+      fromScore: previous.score,
+      toScore: risk.score,
+    })
+  }
+  return moves.sort((a, b) => b.toScore - a.toScore)
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<SupportedLanguage>("en")
-  const [view, setView] = useState<SessionView>("today")
   const [context, setContext] = useState<LifeContext | null>(null)
   const [currentAction, setCurrentAction] = useState<DailyAction | null>(null)
-  const [thread, setThread] = useState<ThreadItem[]>([])
-  const [changesDetected, setChangesDetected] = useState<string[]>([])
+  const [turns, setTurns] = useState<Turn[]>([])
+  const [title, setTitle] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>("idle")
   const [source, setSource] = useState<"live_ai" | "demo_backup" | null>(null)
   const [draft, setDraft] = useState("")
+  const [openPanels, setOpenPanels] = useState<Record<PanelKey, boolean>>({
+    pulse: true,
+    known: false,
+    actions: false,
+  })
 
   const sessionId = useRef(`session_${newId()}`)
 
-  const append = useCallback((role: ThreadItem["role"], text: string) => {
-    setThread((items) => [...items, { id: newId(), role, text }])
+  const togglePanel = useCallback((key: PanelKey) => {
+    setOpenPanels((panels) => ({ ...panels, [key]: !panels[key] }))
+  }, [])
+
+  // Drives the :lang(my) metrics in globals.css that keep Burmese from
+  // overflowing containers sized for Latin.
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
+
+  const openTurn = useCallback((kind: TurnKind, userText: string): string => {
+    const id = newId()
+    setTurns((items) => [
+      ...items,
+      {
+        id,
+        kind,
+        userText,
+        assistantText: null,
+        riskMoves: [],
+        changes: [],
+        pending: true,
+        failed: false,
+      },
+    ])
+    return id
+  }, [])
+
+  const closeTurn = useCallback((id: string, patch: Partial<Turn>) => {
+    setTurns((items) =>
+      items.map((turn) => (turn.id === id ? { ...turn, ...patch, pending: false } : turn)),
+    )
   }, [])
 
   const reset = useCallback(() => {
     setContext(null)
     setCurrentAction(null)
-    setThread([])
-    setChangesDetected([])
+    setTurns([])
+    setTitle(null)
     setError(null)
     setFollowUpStatus("idle")
     setSource(null)
     setDraft("")
-    setView("today")
     sessionId.current = `session_${newId()}`
   }, [])
 
@@ -112,42 +190,48 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const trimmed = input.trim()
       if (!trimmed || loading) return
 
+      const isFirst = context === null
       setLoading(true)
       setError(null)
-      append("user", trimmed)
       setDraft("")
+      if (isFirst) setTitle(trimmed)
+      const turnId = openTurn(isFirst ? "analyze" : "update", trimmed)
 
       try {
-        // The first message analyses a life story; later ones merge into the context.
-        const data = context
-          ? await postJson<LifeUpdateResponse>("/api/life-update", {
+        const data = isFirst
+          ? await postJson<AnalyzeResponse>("/api/analyze", {
+              language,
+              input: trimmed,
+            })
+          : await postJson<LifeUpdateResponse>("/api/life-update", {
               language,
               input: trimmed,
               context,
             })
-          : await postJson<AnalyzeResponse>("/api/analyze", {
-              language,
-              input: trimmed,
-            })
 
         if (!data.success) {
           setError(data.error.message)
+          closeTurn(turnId, { failed: true })
           return
         }
 
-        setContext("context" in data ? data.context : data.updatedContext)
+        const next = "context" in data ? data.context : data.updatedContext
+        closeTurn(turnId, {
+          assistantText: data.assistantMessage,
+          riskMoves: diffRisks(context, next),
+          changes: "changesDetected" in data ? data.changesDetected : [],
+        })
+        setContext(next)
         setCurrentAction(data.dailyAction)
-        setChangesDetected("changesDetected" in data ? data.changesDetected : [])
         setSource(data.source)
-        append("assistant", data.assistantMessage)
-        setView("today")
       } catch {
         setError(GENERIC_ERROR[language])
+        closeTurn(turnId, { failed: true })
       } finally {
         setLoading(false)
       }
     },
-    [append, context, language, loading],
+    [closeTurn, context, language, loading, openTurn],
   )
 
   const submitAnswer = useCallback(
@@ -156,7 +240,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       setLoading(true)
       setError(null)
-      append("user", String(answer))
+      const turnId = openTurn("answer", String(answer))
 
       try {
         const data = await postJson<CompleteActionResponse>("/api/complete-action", {
@@ -168,13 +252,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         if (!data.success) {
           setError(data.error.message)
+          closeTurn(turnId, { failed: true })
           return
         }
 
+        closeTurn(turnId, {
+          assistantText: data.assistantMessage,
+          riskMoves: diffRisks(context, data.updatedContext),
+        })
         setContext(data.updatedContext)
         setCurrentAction(data.nextAction)
         setSource(data.source)
-        append("assistant", data.assistantMessage)
 
         // n8n schedules the follow-up. A failure here must not affect the answer.
         setFollowUpStatus("pending")
@@ -193,28 +281,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           .catch(() => setFollowUpStatus("unavailable"))
       } catch {
         setError(GENERIC_ERROR[language])
+        closeTurn(turnId, { failed: true })
       } finally {
         setLoading(false)
       }
     },
-    [append, context, currentAction, language, loading],
+    [closeTurn, context, currentAction, language, loading, openTurn],
   )
 
   const value = useMemo<SessionValue>(
     () => ({
       language,
       setLanguage,
-      view,
-      setView,
+      openPanels,
+      togglePanel,
       context,
       currentAction,
-      thread,
-      changesDetected,
+      turns,
+      title,
       loading,
       error,
       followUpStatus,
       source,
-      started: context !== null,
+      started: context !== null || turns.length > 0,
       draft,
       setDraft,
       submitInput,
@@ -223,11 +312,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       language,
-      view,
+      openPanels,
+      togglePanel,
       context,
       currentAction,
-      thread,
-      changesDetected,
+      turns,
+      title,
       loading,
       error,
       followUpStatus,

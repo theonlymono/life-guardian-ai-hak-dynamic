@@ -128,4 +128,20 @@
   html {
     @apply font-sans;
   }
+
+}
+
+/*
+ * Burmese stacks diacritics above and below the baseline, so it clips at the
+ * line-heights that suit Latin. This sits outside @layer so it also wins over
+ * Tailwind's leading-* utilities; every container that holds translated text is
+ * sized to fit this taller line box, which is what keeps the EN/MY layouts
+ * identical instead of one language pushing the other's boxes around.
+ */
+:lang(my) {
+  font-family:
+    var(--font-sans), "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Myanmar MN",
+    sans-serif;
+  line-height: 1.85;
+  word-break: break-word;
 }

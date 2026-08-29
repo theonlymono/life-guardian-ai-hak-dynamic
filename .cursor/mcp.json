@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "wispr-flow": {
+      "url": "https://api.wisprflow.ai/connect/mcp"
+    },
+    "mobbin": {
+      "url": "https://api.mobbin.com/mcp"
+    }
+  }
+}

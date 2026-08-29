@@ -8,46 +8,48 @@ import {
   Add01Icon,
   Analytics01Icon,
   File01Icon,
+  IdeaIcon,
   Clock01Icon,
-  UserAdd01Icon,
-  ComputerIcon,
 } from "@hugeicons/core-free-icons"
 import { PerplexityMark } from "./perplexity-logo"
-import { useSession, type SessionView } from "@/components/life-guardian/session-provider"
+import { useSession, type PanelKey } from "@/components/life-guardian/session-provider"
 import { t } from "@/components/life-guardian/copy"
-import type { SupportedLanguage } from "@/lib/types/life-context"
 
-const navItems: {
-  view: SessionView
-  label: Record<SupportedLanguage, string>
-  icon: typeof ComputerIcon
+const panelItems: {
+  key: PanelKey
+  labelKey: "lifePulse" | "knownAbout" | "completedActions"
+  icon: typeof Analytics01Icon
 }[] = [
-  { view: "today", label: { en: "Today", my: "ဒီနေ့" }, icon: ComputerIcon },
-  {
-    view: "pulse",
-    label: { en: "Life Pulse", my: "ဘဝအခြေအနေ" },
-    icon: Analytics01Icon,
-  },
-  {
-    view: "actions",
-    label: { en: "Actions", my: "လုပ်ဆောင်ချက်များ" },
-    icon: File01Icon,
-  },
-  { view: "history", label: { en: "History", my: "မှတ်တမ်း" }, icon: Clock01Icon },
+  { key: "pulse", labelKey: "lifePulse", icon: Analytics01Icon },
+  { key: "known", labelKey: "knownAbout", icon: IdeaIcon },
+  { key: "actions", labelKey: "completedActions", icon: File01Icon },
 ]
 
 export function AppSidebar() {
-  const { view, setView, reset, language, context, followUpStatus } = useSession()
+  const {
+    reset,
+    language,
+    context,
+    title,
+    started,
+    openPanels,
+    togglePanel,
+    followUpStatus,
+  } = useSession()
   const copy = t(language)
 
-  const counts: Partial<Record<SessionView, number>> = {
+  const counts: Record<PanelKey, number> = {
     pulse: context?.risks.length ?? 0,
+    known:
+      (context ? Object.keys(context.profile).length : 0) +
+      (context?.lifeEvents.length ?? 0) +
+      (context?.commitments.length ?? 0),
     actions: context?.completedActions.length ?? 0,
   }
 
   return (
     <aside className="flex h-screen w-[240px] shrink-0 flex-col border-r border-border/60 bg-[#f7f8f9]">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="flex h-14 items-center px-4">
         <PerplexityMark className="size-6 text-foreground" />
       </div>
 
@@ -57,45 +59,59 @@ export function AppSidebar() {
           onClick={reset}
           className="h-9 w-full justify-start gap-2 rounded-lg border-border/80 bg-white px-3 text-sm font-normal shadow-none hover:bg-white"
         >
-          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.5} className="size-4" />
-          {copy.newSession}
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.5} className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{copy.newSession}</span>
         </Button>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-2 pt-1">
-        {navItems.map((item) => {
-          const count = counts[item.view]
-          return (
-            <button
-              key={item.view}
-              type="button"
-              onClick={() => setView(item.view)}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                view === item.view
-                  ? "bg-[#eceef0] font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-[#eceef0]/60 hover:text-foreground",
-              )}
-            >
-              <HugeiconsIcon icon={item.icon} strokeWidth={1.5} className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate text-left">
-                {item.label[language]}
+      <nav className="space-y-0.5 px-2 pt-1">
+        {panelItems.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => togglePanel(item.key)}
+            aria-pressed={openPanels[item.key]}
+            className={cn(
+              "flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
+              openPanels[item.key]
+                ? "bg-[#eceef0] font-medium text-foreground"
+                : "text-muted-foreground hover:bg-[#eceef0]/60 hover:text-foreground",
+            )}
+          >
+            <HugeiconsIcon icon={item.icon} strokeWidth={1.5} className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">
+              {copy[item.labelKey]}
+            </span>
+            {counts[item.key] > 0 && (
+              <span className="shrink-0 rounded bg-white px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                {counts[item.key]}
               </span>
-              {count ? (
-                <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {count}
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
+            )}
+          </button>
+        ))}
       </nav>
+
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-2">
+        <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {copy.today}
+        </div>
+        {started ? (
+          <div className="flex h-9 items-center gap-2.5 rounded-lg bg-[#eceef0] px-3 text-sm text-foreground">
+            <HugeiconsIcon icon={Clock01Icon} strokeWidth={1.5} className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{title ?? copy.untitled}</span>
+          </div>
+        ) : (
+          <div className="px-3 text-[11px] leading-relaxed text-muted-foreground/70">
+            {copy.lifePulseEmpty}
+          </div>
+        )}
+      </div>
 
       <div className="space-y-2 border-t border-border/60 p-3">
         {followUpStatus !== "idle" && (
           <div
             className={cn(
-              "rounded-lg px-2.5 py-2 text-[11px] leading-relaxed",
+              "flex h-7 items-center truncate rounded-lg px-2.5 text-[11px]",
               followUpStatus === "scheduled"
                 ? "bg-[#0084ff]/10 text-[#003da5]"
                 : "bg-[#eceef0] text-muted-foreground",
@@ -110,28 +126,17 @@ export function AppSidebar() {
         )}
 
         <div className="flex items-center gap-2.5 px-1">
-          <Avatar size="sm">
+          <Avatar size="sm" className="shrink-0">
             <AvatarImage src="https://api.dicebear.com/9.x/avataaars/svg?seed=Alex" />
             <AvatarFallback>AS</AvatarFallback>
           </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium">Life Companion</span>
-              <span className="rounded bg-[#0084ff]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#003da5]">
-                AI
-              </span>
-            </div>
-          </div>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            Life Companion
+          </span>
+          <span className="shrink-0 rounded bg-[#0084ff]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#003da5]">
+            AI
+          </span>
         </div>
-
-        <button
-          type="button"
-          disabled
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground/50 transition-colors"
-        >
-          <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={1.5} className="size-4" />
-          Invite family
-        </button>
       </div>
     </aside>
   )
