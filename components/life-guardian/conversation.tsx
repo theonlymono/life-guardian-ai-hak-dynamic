@@ -13,6 +13,8 @@ import type { RiskLevel } from "@/lib/types/life-context"
 import { ActionCard } from "./action-card"
 import { SummaryCard } from "./summary-card"
 import { SimulationCard } from "./simulation-card"
+import { ProductOffer } from "./product-offer"
+import { levelLabel } from "@/lib/i18n/context-labels"
 import { CATEGORY_LABELS, t } from "./copy"
 import { TURN_STEPS, useSession, type RiskMove, type Turn } from "./session-provider"
 
@@ -34,7 +36,7 @@ export function Conversation() {
   }, [turns, currentAction])
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-6 py-6">
+    <div className="mx-auto w-full max-w-[720px] px-4 py-5 sm:px-6 sm:py-6">
       {source === "demo_backup" && (
         <div className="mb-4 rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground">
           {copy.demoBackup}
@@ -51,6 +53,7 @@ export function Conversation() {
         {/* The projection outlives any single question: it stays visible while
             the remaining questions are asked and under the closing summary. */}
         {!loading && simulation && <SimulationCard />}
+        {!loading && summary && <ProductOffer />}
 
         {error && (
           <div className="rounded-xl border border-red-500/25 bg-red-500/5 px-4 py-2.5 text-sm text-red-700">
@@ -169,7 +172,7 @@ function RiskMoveChip({ move }: { move: RiskMove }) {
       <span className="tabular-nums text-muted-foreground">
         {move.fromScore} {rising ? "↑" : "↓"} {move.toScore}
       </span>
-      {move.fromLevel !== move.toLevel && <span>{move.toLevel}</span>}
+      {move.fromLevel !== move.toLevel && <span>{levelLabel(move.toLevel, language)}</span>}
     </span>
   )
 }

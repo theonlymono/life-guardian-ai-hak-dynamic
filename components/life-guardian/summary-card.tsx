@@ -2,6 +2,7 @@
 
 import { HugeiconsIcon } from "@hugeicons/react"
 import { CheckmarkCircle02Icon, IdeaIcon } from "@hugeicons/core-free-icons"
+import { focusLabel } from "@/lib/i18n/context-labels"
 import { useSession } from "./session-provider"
 import { t } from "./copy"
 
@@ -43,7 +44,9 @@ export function SummaryCard() {
                 {index + 1}
               </span>
               <div className="min-w-0">
-                <div className="text-sm font-medium text-foreground">{item.focus}</div>
+                <div className="text-sm font-medium text-foreground">
+                {focusLabel(item.focus, language)}
+              </div>
                 <p className="text-[13px] leading-relaxed text-muted-foreground">{item.why}</p>
               </div>
             </li>

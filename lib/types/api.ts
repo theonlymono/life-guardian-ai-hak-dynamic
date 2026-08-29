@@ -115,6 +115,7 @@ export interface ChatRiskMove {
 
 export interface ChatLogRequest {
   sessionId: string;
+  accountId?: string;
   language?: SupportedLanguage;
   kind: ChatTurnKind;
   userText: string;

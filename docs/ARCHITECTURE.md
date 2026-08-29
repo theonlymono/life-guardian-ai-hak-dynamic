@@ -64,6 +64,89 @@ Two rules keep figures honest. Nobody may quote a price: the model does not know
 
 `rejectUnrelatedCommitmentEdits` closes the other half of that bug: an answer may add a commitment we have never held, but it may only change an existing amount when the question was actually about that commitment. `mergeCommitments` then matches on type alone, so a corrected balance replaces the old one instead of leaving two conflicting mortgages in the context.
 
+## Account
+
+Two layers, and the order matters. A first-time visitor gets a guest identity
+with no sign-in at all: `lib/account/local-account.ts` mints an id into
+`localStorage` and `lib/account/storage.ts` keeps the whole transcript beside
+it. Nobody is asked for a password before they can start talking, because a
+login screen on the way in costs more returning customers than it protects.
+
+Signing in is the optional second layer, for carrying that history to another
+device. Username and password only — no email is collected, which is worth
+stating plainly because it means there is no password reset. The sign-in card
+says so rather than letting someone find out after they forget.
+
+The guest id is self-asserted and the server treats it that way: it travels
+with `/api/log-turn` so a person's turns group together, and authorises
+nothing.
+
+### How credentials are handled
+
+`lib/auth/password.ts` derives with scrypt from the standard library, a fresh
+16-byte salt per account, and verifies with a constant-time compare. Passwords
+are never stored or logged in a form we can read back — people reuse passwords,
+so a leak here would be a leak of their bank. Verification also rejects any
+stored hash that is not exactly the length we write: a malformed hex string
+decodes to zero bytes, and comparing two empty buffers succeeds, which would
+have let a corrupt row accept any password.
+
+`lib/auth/accounts.ts` holds accounts, sessions and per-account history in
+Atlas. Session tokens are random 32-byte values stored only as a SHA-256 hash,
+so a database dump cannot be replayed as a login, and they carry a TTL index so
+Atlas expires them. The cookie is httpOnly and sameSite=lax, putting the token
+out of reach of page scripts. Unknown usernames and wrong passwords return the
+identical response, so the form cannot be used to discover who has an account.
+A unique index on the username settles the race between two simultaneous
+signups rather than trusting a check-then-insert.
+
+`/api/account/history` resolves the account from the cookie and never from the
+request body, so nobody can name someone else's account and read or overwrite
+it.
+
+### Keeping one person's history out of another's
+
+Server-side isolation is the easy half. The harder half is the browser, which
+is shared by everyone who uses the device, so stored history is keyed by owner:
+`guest:<localId>` for a visitor who has not signed in, `user:<username>` for one
+who has. Three rules follow from that key:
+
+- Signing out deletes that account's cached copy from the device. Their history
+  is safe in Atlas; the next person to open the browser must not find it.
+- Signing in loads that account's own history. If the account has none yet, the
+  conversation on screen is adopted — but only because the sign-in card is
+  reachable only while signed out, and signing out has already wiped the
+  screen, so what is showing was told as a guest and belongs to nobody else.
+- Nothing is written until `/api/auth/me` has answered. Without that wait, a
+  guest's conversations could be saved into an account during the moment
+  between page load and knowing who is signed in.
+
+## Products
+
+`lib/products/daiichi.ts` transcribes Daiichi Life Myanmar's published range —
+entry ages, policy terms, minimum sums assured, brochure links. Every figure is
+theirs. Premiums are deliberately absent, because we cannot compute one and an
+invented number would be the most harmful thing on the page.
+
+`lib/products/match.ts` ranks products against the deterministic risk scores.
+No model touches it. A category scoring below 30 produces nothing, each match
+cites the risk that produced it, at most three appear, and an age outside the
+published entry range is flagged rather than hidden.
+
+The offer is separated from the engagement loop on purpose. The assistant never
+mentions a product while it is still collecting facts — one that steers toward
+a sale mid-interview does not deserve the answers. `ProductOffer` renders after
+the summary, opens with a question, and accepts "not now".
+
+## Language
+
+The stored context keeps English technical values so that switching language
+changes no fact and no score. That leaves display strings like `2 years` and
+`emergency savings` in the UI, which `lib/i18n/context-labels.ts` translates at
+render time: focus names, risk levels, time horizons and the missing-information
+list. Unrecognised values fall through unchanged — a stray English word beats
+dropping something the customer told us.
+
 ## Projections
 
 Once a customer has named a dated goal, three answers turn the conversation into a number: what they have saved, what they think it will cost, and what they can add each month. `lib/simulation/goal.ts` does the arithmetic and `resolveGoalProgress` decides whether it can run yet.

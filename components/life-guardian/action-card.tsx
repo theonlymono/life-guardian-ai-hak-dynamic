@@ -4,6 +4,8 @@ import { useState, type KeyboardEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon, Clock01Icon } from "@hugeicons/core-free-icons"
+import { focusLabel } from "@/lib/i18n/context-labels"
+import { readTypedNumber } from "@/lib/i18n/money"
 import { useSession } from "./session-provider"
 import { t } from "./copy"
 
@@ -29,25 +31,26 @@ export function ActionCard() {
     if (!canSend) return
     const trimmed = value.trim()
     if (action.actionType === "numeric_input") {
-      const numeric = Number(trimmed.replace(/[^0-9.-]/g, ""))
-      send(Number.isFinite(numeric) && trimmed !== "" ? numeric : trimmed)
+      send(readTypedNumber(trimmed))
       return
     }
     send(trimmed)
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
-      event.preventDefault()
-      sendTyped()
-    }
+    if (event.key !== "Enter") return
+    // See the composer: Enter commits a Burmese syllable before it submits.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+
+    event.preventDefault()
+    sendTyped()
   }
 
   return (
     <div className="rounded-2xl border border-border/50 bg-white p-5 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]">
       <div className="mb-2 flex h-6 items-center gap-2">
         <span className="rounded-full bg-[#0084ff]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#003da5]">
-          {action.focus}
+          {focusLabel(action.focus, language)}
         </span>
         <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <HugeiconsIcon icon={Clock01Icon} strokeWidth={1.5} className="size-3" />
@@ -134,7 +137,8 @@ export function ActionCard() {
                 placeholder={
                   action.actionType === "numeric_input" ? copy.enterNumber : copy.typeAnswer
                 }
-                className="h-full min-w-0 flex-1 rounded-full bg-transparent px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60"
+                /* 16px on phones: iOS zooms the page in on any smaller field. */
+                className="h-full min-w-0 flex-1 rounded-full bg-transparent px-4 text-base text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60 sm:text-sm"
               />
               {/* Without the unit, "2" could be two months or two hundred thousand. */}
               {action.unitHint ? (

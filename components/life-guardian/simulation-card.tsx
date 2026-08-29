@@ -83,7 +83,7 @@ export function SimulationCard() {
             onChange={(event) => setDraft(event.target.value)}
             inputMode="decimal"
             placeholder={copy.enterNumber}
-            className="h-full min-w-0 flex-1 rounded-full bg-transparent px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+            className="h-full min-w-0 flex-1 rounded-full bg-transparent px-3 text-base text-foreground outline-none placeholder:text-muted-foreground/60 sm:text-sm"
           />
           <span className="shrink-0 whitespace-nowrap text-[12px] text-muted-foreground">
             {unit}

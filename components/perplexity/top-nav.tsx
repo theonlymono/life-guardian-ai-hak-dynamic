@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { ArrowLeft01Icon, Menu01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { AccountChip } from "@/components/life-guardian/account-chip"
 import { useSession } from "@/components/life-guardian/session-provider"
 import { t } from "@/components/life-guardian/copy"
 import type { SupportedLanguage } from "@/lib/types/life-context"
@@ -15,23 +16,34 @@ const LANGUAGES: { code: SupportedLanguage; label: string }[] = [
 ]
 
 export function TopNav() {
-  const { language, setLanguage, title, started, reset, followUpStatus } = useSession()
+  const { language, setLanguage, title, started, reset, followUpStatus, navOpen, setNavOpen } =
+    useSession()
   const copy = t(language)
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-4">
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-border/60 px-2 sm:gap-2 sm:px-4">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => setNavOpen(!navOpen)}
+        aria-label={copy.newSession}
+        className="size-8 shrink-0 text-muted-foreground md:hidden"
+      >
+        <HugeiconsIcon icon={Menu01Icon} strokeWidth={1.5} />
+      </Button>
+
       {started ? (
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={reset}
           aria-label={copy.startOver}
-          className="size-8 shrink-0 text-muted-foreground"
+          className="hidden size-8 shrink-0 text-muted-foreground sm:flex"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={1.5} />
         </Button>
       ) : (
-        <div className="size-8 shrink-0" aria-hidden />
+        <div className="hidden size-8 shrink-0 sm:block" aria-hidden />
       )}
 
       <h1 className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">
@@ -81,14 +93,18 @@ export function TopNav() {
           variant="ghost"
           size="icon-sm"
           disabled
-          className="size-8 text-muted-foreground disabled:opacity-40"
+          className="hidden size-8 text-muted-foreground disabled:opacity-40 sm:flex"
         >
           <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.5} />
         </Button>
 
-        <Avatar size="sm" className="size-7">
-          <AvatarFallback className="bg-[#eceef0] text-[11px]">U</AvatarFallback>
-        </Avatar>
+        {/* Fixed width from sm up: the guest handle and the sign-in label are
+            different lengths in each language, and without this the whole
+            header slides when the toggle is switched. On a phone the width is
+            left to the content, which has too little room to spare. */}
+        <div className="flex min-w-0 justify-end sm:w-[186px] sm:shrink-0">
+          <AccountChip />
+        </div>
       </div>
     </header>
   )

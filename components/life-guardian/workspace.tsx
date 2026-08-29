@@ -14,7 +14,7 @@ export function Workspace() {
 
   if (!started) {
     return (
-      <main className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-24">
+      <main className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-16 sm:px-6 sm:pb-24">
         {/* Subtle grainy orb glow — design.md §4.1 */}
         <div
           aria-hidden
@@ -26,7 +26,7 @@ export function Workspace() {
           style={{ filter: "url(#grainy-noise)" }}
         />
 
-        <div className="relative mb-10">
+        <div className="relative mb-8 sm:mb-10">
           <PerplexityLogo />
         </div>
 
@@ -53,9 +53,10 @@ export function Workspace() {
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Conversation />
+          <RightRail inline />
         </div>
 
-        <div className="shrink-0 px-6 pb-5 pt-2">
+        <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6 sm:pb-5">
           <div className="mx-auto w-full max-w-[720px]">
             <Composer compact />
           </div>

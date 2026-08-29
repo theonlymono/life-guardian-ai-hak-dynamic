@@ -320,11 +320,14 @@ Forwards an engagement event to n8n. Core product must not depend on this succee
 
 Archives one conversation turn through n8n into MongoDB Atlas. Logging only — call it without awaiting and ignore the result.
 
+`accountId` is optional and comes from the browser's local account. It groups a person's own turns and authorises nothing, so the server never trusts it as identity.
+
 ### Request
 
 ```json
 {
   "sessionId": "session_9f2c...",
+  "accountId": "acct_2f1c...",
   "language": "en",
   "kind": "answer",
   "userText": "About one month",
@@ -368,3 +371,22 @@ Returns HTTP 200. A missing webhook URL, an unpublished workflow, or a failed Mo
 5. Render `action.unitHint` beside a `numeric_input` field and send the bare number. `commitment.amount` is always whole currency units — format it with `formatMoney` from `lib/i18n/money.ts`, which writes kyat as သိန်း for Burmese readers. Never convert between currencies.
 6. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
 7. Optional: after every turn, call `/api/log-turn` in the background. Never await it or surface `stored: false`.
+
+## Auth
+
+Username and password only. No email is collected, so there is no password reset.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/auth/signup` | POST | `{ username, password }` → sets an httpOnly session cookie |
+| `/api/auth/login` | POST | Same shape; identical response for unknown user and wrong password |
+| `/api/auth/logout` | POST | Deletes the session server-side, not just the cookie |
+| `/api/auth/me` | GET | `{ account: { username, createdAt } | null }` |
+| `/api/account/history` | GET / PUT | The signed-in account's saved conversation |
+
+Rules: username 3–30 characters of `a-z A-Z 0-9 . _ -`, password at least 8.
+Failure reasons are `credentials`, `taken`, `invalid` or `unavailable`.
+
+The account is always resolved from the session cookie, never from the request
+body. Signing in is optional — the app is fully usable as a guest, and history
+is kept in the browser either way.

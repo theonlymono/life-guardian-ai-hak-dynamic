@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import type { RiskLevel } from "@/lib/types/life-context"
 import { formatMoney } from "@/lib/i18n/money"
+import { focusLabel, horizonLabel, unknownLabel } from "@/lib/i18n/context-labels"
 import { useSession, type PanelKey } from "./session-provider"
 import { CATEGORY_LABELS, t } from "./copy"
 
@@ -22,7 +23,7 @@ const LEVEL_TEXT: Record<RiskLevel, string> = {
   CRITICAL: "text-red-700",
 }
 
-export function RightRail() {
+export function RightRail({ inline = false }: { inline?: boolean }) {
   const { context, language } = useSession()
   const copy = t(language)
 
@@ -34,7 +35,16 @@ export function RightRail() {
     (context?.commitments.length ?? 0)
 
   return (
-    <aside className="hidden w-[268px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border/60 px-3 py-4 lg:flex">
+    <aside
+      className={cn(
+        "flex flex-col gap-2",
+        // Below lg there is no room for a third column, so the same panels
+        // ride along under the conversation instead of disappearing.
+        inline
+          ? "w-full border-t border-border/60 px-4 py-4 lg:hidden"
+          : "hidden w-[268px] shrink-0 overflow-y-auto border-l border-border/60 px-3 py-4 lg:flex",
+      )}
+    >
       <Panel panelKey="pulse" title={copy.lifePulse} count={risks.length}>
         {risks.length === 0 ? (
           <Empty text={copy.lifePulseEmpty} />
@@ -97,7 +107,10 @@ export function RightRail() {
               <p key={event.id} className="text-[11px] leading-relaxed text-foreground">
                 {event.description}
                 {event.timeHorizon ? (
-                  <span className="text-muted-foreground"> · {event.timeHorizon}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {horizonLabel(event.timeHorizon, language)}
+                  </span>
                 ) : null}
               </p>
             ))}
@@ -125,7 +138,7 @@ export function RightRail() {
                       key={item}
                       className="rounded border border-dashed border-border px-1.5 py-0.5 text-[10px] text-muted-foreground"
                     >
-                      {item}
+                      {unknownLabel(item, language)}
                     </span>
                   ))}
                 </div>
@@ -143,7 +156,7 @@ export function RightRail() {
             {[...completed].reverse().map((item, index) => (
               <li key={`${item.actionId}-${index}`}>
                 <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-[#003da5]">
-                  {item.focus}
+                  {focusLabel(item.focus, language)}
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
                   {item.question}

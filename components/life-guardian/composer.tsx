@@ -22,10 +22,15 @@ export function Composer({ compact = false }: { compact?: boolean }) {
   const [showDictateHint, setShowDictateHint] = useState(false)
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault()
-      void submitInput(draft)
-    }
+    if (event.key !== "Enter" || event.shiftKey) return
+
+    // Burmese input methods compose a syllable across several keystrokes and
+    // use Enter to commit it. Submitting on that Enter throws the half-formed
+    // syllable away, which reads as the box simply refusing to accept typing.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+
+    event.preventDefault()
+    void submitInput(draft)
   }
 
   /*
@@ -63,8 +68,9 @@ export function Composer({ compact = false }: { compact?: boolean }) {
           disabled={loading}
           /* Explicit heights, not rows: a row is taller in Burmese than Latin. */
           className={cn(
-            "w-full resize-none bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60",
-            compact ? "h-[46px] px-4 pt-3 pb-1" : "h-[116px] px-5 pt-5 pb-2 text-[15px]",
+            /* 16px on phones: iOS zooms the page in on any smaller field. */
+            "w-full resize-none bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-60 sm:text-[14px]",
+            compact ? "h-[46px] px-4 pt-3 pb-1" : "h-[116px] px-4 pt-4 pb-2 sm:px-5 sm:pt-5 sm:text-[15px]",
           )}
           placeholder={
             started ? copy.promptPlaceholderOngoing : copy.promptPlaceholder

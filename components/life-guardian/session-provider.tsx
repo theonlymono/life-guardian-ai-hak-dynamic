@@ -22,13 +22,37 @@ import type {
   DailyAction,
   LifeContext,
   LifeSummary,
-  RiskCategory,
-  RiskLevel,
   SupportedLanguage,
 } from "@/lib/types/life-context"
+import type { RiskMove, StepKey, Turn, TurnKind } from "@/lib/types/conversation"
 import type { GoalSimulation } from "@/lib/simulation/goal"
+import { ensureAccount, type LocalAccount } from "@/lib/account/local-account"
+import {
+  clearAccountData,
+  loadAccountData,
+  saveAccountData,
+  guestOwner,
+  trim,
+  upsert,
+  userOwner,
+  type Conversation,
+  type StoredAccount,
+} from "@/lib/account/storage"
+import {
+  fetchAccount,
+  fetchHistory,
+  loginRequest,
+  logoutRequest,
+  pushHistory,
+  signupRequest,
+  type AuthFailure,
+  type AuthUser,
+} from "@/lib/account/remote"
+import { detectLanguage } from "@/lib/i18n/language"
 
-export type TurnKind = "analyze" | "answer" | "update"
+const MAX_QUESTIONS = 5
+
+export type { RiskMove, StepKey, Turn, TurnKind } from "@/lib/types/conversation"
 
 /** Step keys are fixed per turn kind so both languages render the same rows. */
 export const TURN_STEPS: Record<TurnKind, readonly StepKey[]> = {
@@ -36,27 +60,6 @@ export const TURN_STEPS: Record<TurnKind, readonly StepKey[]> = {
   answer: ["stepUnderstand", "stepRisk", "stepAction"],
   update: ["stepMerge", "stepRisk", "stepAction"],
 } as const
-
-export type StepKey = "stepRead" | "stepUnderstand" | "stepMerge" | "stepRisk" | "stepAction"
-
-export interface RiskMove {
-  category: RiskCategory
-  fromLevel: RiskLevel
-  toLevel: RiskLevel
-  fromScore: number
-  toScore: number
-}
-
-export interface Turn {
-  id: string
-  kind: TurnKind
-  userText: string
-  assistantText: string | null
-  riskMoves: RiskMove[]
-  changes: string[]
-  pending: boolean
-  failed: boolean
-}
 
 export type FollowUpStatus = "idle" | "pending" | "scheduled" | "unavailable"
 
@@ -71,6 +74,17 @@ interface SessionValue {
   currentAction: DailyAction | null
   summary: LifeSummary | null
   simulation: GoalSimulation | null
+  account: LocalAccount | null
+  user: AuthUser | null
+  conversations: Conversation[]
+  conversationId: string
+  navOpen: boolean
+  setNavOpen: (open: boolean) => void
+  openConversation: (id: string) => void
+  deleteConversation: (id: string) => void
+  signIn: (username: string, password: string) => Promise<AuthFailure | null>
+  signUp: (username: string, password: string) => Promise<AuthFailure | null>
+  signOut: () => Promise<void>
   questionsAnswered: number
   questionsTotal: number
   turns: Turn[]
@@ -128,12 +142,15 @@ function diffRisks(before: LifeContext | null, after: LifeContext): RiskMove[] {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<SupportedLanguage>("en")
+  const [language, setLanguageState] = useState<SupportedLanguage>("en")
+  // Set once the customer works the toggle themselves, after which their
+  // choice outranks anything we detect.
+  const [languagePinned, setLanguagePinned] = useState(false)
   const [context, setContext] = useState<LifeContext | null>(null)
   const [currentAction, setCurrentAction] = useState<DailyAction | null>(null)
   const [summary, setSummary] = useState<LifeSummary | null>(null)
   const [simulation, setSimulation] = useState<GoalSimulation | null>(null)
-  const [progress, setProgress] = useState({ answered: 0, total: 5 })
+  const [progress, setProgress] = useState({ answered: 0, total: MAX_QUESTIONS })
   const [turns, setTurns] = useState<Turn[]>([])
   const [title, setTitle] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -146,8 +163,200 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     known: false,
     actions: false,
   })
+  // Only meaningful below the medium breakpoint, where the sidebar is a
+  // drawer rather than a column.
+  const [navOpen, setNavOpen] = useState(false)
 
   const sessionId = useRef(`session_${newId()}`)
+  const [account, setAccount] = useState<LocalAccount | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [conversationId, setConversationId] = useState(() => `conv_${newId()}`)
+  // Nothing is written until we know who is signed in, so a guest's history
+  // can never be saved into an account during the moment before /auth/me
+  // answers.
+  const [hydrated, setHydrated] = useState(false)
+
+  const owner = user
+    ? userOwner(user.username)
+    : account
+      ? guestOwner(account.id)
+      : null
+
+  const restore = useCallback((saved: Conversation) => {
+    setConversationId(saved.id)
+    setLanguageState(saved.language)
+    setLanguagePinned(true)
+    setContext(saved.context)
+    setTurns(saved.turns)
+    setCurrentAction(saved.action)
+    setSummary(saved.summary)
+    setSimulation(saved.simulation)
+    setTitle(saved.title)
+    setProgress({ answered: saved.answered, total: MAX_QUESTIONS })
+    setError(null)
+    setDraft("")
+  }, [])
+
+  const adoptStored = useCallback(
+    (stored: StoredAccount) => {
+      setConversations(stored.conversations)
+      const active =
+        stored.conversations.find((item) => item.id === stored.activeId) ??
+        stored.conversations[0]
+      if (active) restore(active)
+    },
+    [restore],
+  )
+
+  /** Wipes the screen so nothing from one owner is visible under another. */
+  const clearAll = useCallback(() => {
+    setConversations([])
+    setConversationId(`conv_${newId()}`)
+    setContext(null)
+    setCurrentAction(null)
+    setSummary(null)
+    setSimulation(null)
+    setProgress({ answered: 0, total: MAX_QUESTIONS })
+    setTurns([])
+    setTitle(null)
+    setError(null)
+    setFollowUpStatus("idle")
+    setSource(null)
+    setDraft("")
+    setLanguagePinned(false)
+  }, [])
+
+  // Created on the client only: the id lives in this browser, so the server
+  // render has nothing to say about it.
+  useEffect(() => {
+    const existing = ensureAccount()
+    setAccount(existing)
+
+    const guest = loadAccountData(guestOwner(existing.id))
+    if (guest) adoptStored(guest)
+
+    void (async () => {
+      const me = await fetchAccount()
+      if (!me) {
+        setHydrated(true)
+        return
+      }
+      setUser(me)
+
+      // Atlas wins, because it is the copy that followed them from whatever
+      // device they used last. If the account has nothing yet, the guest
+      // conversations showing a moment ago are cleared rather than absorbed:
+      // on a shared device they may belong to whoever sat here before.
+      const remote = await fetchHistory()
+      const cached = loadAccountData(userOwner(me.username))
+      if (remote) adoptStored(remote)
+      else if (cached) adoptStored(cached)
+      else clearAll()
+
+      setHydrated(true)
+    })()
+  }, [adoptStored, clearAll])
+
+  // Keeps the customer's own copy current so a refresh, a new chat, or
+  // tomorrow all leave the earlier conversations reachable. The backend stays
+  // stateless; this is purely theirs.
+  useEffect(() => {
+    if (!owner || !hydrated || !context) return
+
+    const current: Conversation = {
+      id: conversationId,
+      title,
+      language,
+      context,
+      turns,
+      action: currentAction,
+      summary,
+      simulation,
+      answered: progress.answered,
+      savedAt: new Date().toISOString(),
+    }
+
+    setConversations((existing) => {
+      const next = trim({ conversations: upsert(existing, current), activeId: conversationId })
+      saveAccountData(owner, next)
+      // Mirrored to Atlas for signed-in accounts. Fire-and-forget: a failed
+      // sync must not interrupt the conversation, and the local copy still
+      // holds everything.
+      if (user) void pushHistory(next)
+      return next.conversations
+    })
+  }, [
+    conversationId,
+    context,
+    currentAction,
+    hydrated,
+    language,
+    owner,
+    progress.answered,
+    simulation,
+    summary,
+    title,
+    turns,
+    user,
+  ])
+
+  const setLanguage = useCallback((next: SupportedLanguage) => {
+    setLanguagePinned(true)
+    setLanguageState(next)
+  }, [])
+
+  /**
+   * Signing in adopts whatever the account already holds. If it holds nothing
+   * yet, the conversation on screen stays and becomes that account's first
+   * saved history — nobody loses the story they just told by signing in.
+   */
+  const adopt = useCallback(
+    async (result: { user: AuthUser | null; reason?: AuthFailure }): Promise<AuthFailure | null> => {
+      if (!result.user) return result.reason ?? "unavailable"
+
+      setUser(result.user)
+
+      const remote = await fetchHistory()
+      const cached = loadAccountData(userOwner(result.user.username))
+      if (remote) adoptStored(remote)
+      else if (cached) adoptStored(cached)
+      // Nothing stored yet. Whatever is on screen was told as a guest — the
+      // sign-in card is only reachable when signed out, and signing out wipes
+      // the screen — so it belongs to nobody else and becomes theirs. That
+      // way you never lose the story you just told by creating an account.
+
+      return null
+    },
+    [adoptStored],
+  )
+
+  const signIn = useCallback(
+    async (username: string, password: string) => adopt(await loginRequest(username, password)),
+    [adopt],
+  )
+
+  const signUp = useCallback(
+    async (username: string, password: string) => adopt(await signupRequest(username, password)),
+    [adopt],
+  )
+
+  /**
+   * Leaves nothing of this account behind on the device. The cached copy is
+   * deleted rather than kept for a faster return: their history is safe in
+   * Atlas, and the next person to use this browser must not find it.
+   */
+  const signOut = useCallback(async () => {
+    if (user) clearAccountData(userOwner(user.username))
+    await logoutRequest()
+    setUser(null)
+    clearAll()
+
+    if (account) {
+      const guest = loadAccountData(guestOwner(account.id))
+      if (guest) adoptStored(guest)
+    }
+  }, [account, adoptStored, clearAll, user])
 
   const togglePanel = useCallback((key: PanelKey) => {
     setOpenPanels((panels) => ({ ...panels, [key]: !panels[key] }))
@@ -199,6 +408,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }) => {
       void postJson<ChatLogResponse>("/api/log-turn", {
         sessionId: sessionId.current,
+        accountId: account?.id,
         language,
         kind: args.kind,
         userText: args.userText,
@@ -232,28 +442,73 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         riskMoves: args.riskMoves,
       }).catch(() => undefined)
     },
-    [language],
+    [account, language],
   )
 
+  /**
+   * Starts a new conversation. The one on screen is already saved under its
+   * own id, so it stays in the history list — beginning a new chat is not a
+   * way to throw the last one away.
+   */
   const reset = useCallback(() => {
+    setConversationId(`conv_${newId()}`)
     setContext(null)
     setCurrentAction(null)
     setSummary(null)
     setSimulation(null)
-    setProgress({ answered: 0, total: 5 })
+    setProgress({ answered: 0, total: MAX_QUESTIONS })
     setTurns([])
     setTitle(null)
     setError(null)
     setFollowUpStatus("idle")
     setSource(null)
     setDraft("")
+    // A new conversation should read the next story fresh rather than inherit
+    // a language the previous one settled on.
+    setLanguagePinned(false)
     sessionId.current = `session_${newId()}`
   }, [])
+
+  const openConversation = useCallback(
+    (id: string) => {
+      const found = conversations.find((item) => item.id === id)
+      if (!found) return
+      restore(found)
+      setFollowUpStatus("idle")
+      setSource(null)
+      sessionId.current = `session_${newId()}`
+    },
+    [conversations, restore],
+  )
+
+  /** Removes one conversation. The rest of the history is untouched. */
+  const deleteConversation = useCallback(
+    (id: string) => {
+      setConversations((existing) => {
+        const next = existing.filter((item) => item.id !== id)
+        if (owner) {
+          if (next.length === 0) clearAccountData(owner)
+          else saveAccountData(owner, { conversations: next, activeId: conversationId })
+        }
+        if (user) void pushHistory({ conversations: next, activeId: conversationId })
+        return next
+      })
+      if (id === conversationId) reset()
+    },
+    [conversationId, owner, reset, user],
+  )
 
   const submitInput = useCallback(
     async (input: string) => {
       const trimmed = input.trim()
       if (!trimmed || loading) return
+
+      // Someone typing Burmese has told us which language they want more
+      // plainly than the toggle has. Detection only ever moves toward Burmese:
+      // Latin script is no evidence either way, since romanised Burmese is
+      // common, so it never drags a Burmese session back to English.
+      const active = !languagePinned ? (detectLanguage(trimmed) ?? language) : language
+      if (active !== language) setLanguageState(active)
 
       const isFirst = context === null
       setLoading(true)
@@ -265,11 +520,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         const data = isFirst
           ? await postJson<AnalyzeResponse>("/api/analyze", {
-              language,
+              language: active,
               input: trimmed,
             })
           : await postJson<LifeUpdateResponse>("/api/life-update", {
-              language,
+              language: active,
               input: trimmed,
               context,
             })
@@ -303,13 +558,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           riskMoves,
         })
       } catch {
-        setError(GENERIC_ERROR[language])
+        setError(GENERIC_ERROR[active])
         closeTurn(turnId, { failed: true })
       } finally {
         setLoading(false)
       }
     },
-    [archiveTurn, closeTurn, context, language, loading, openTurn],
+    [archiveTurn, closeTurn, context, language, languagePinned, loading, openTurn],
   )
 
   const submitAnswer = useCallback(
@@ -390,6 +645,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       currentAction,
       summary,
       simulation,
+      account,
+      user,
+      conversations,
+      conversationId,
+      navOpen,
+      setNavOpen,
+      openConversation,
+      deleteConversation,
+      signIn,
+      signUp,
+      signOut,
       questionsAnswered: progress.answered,
       questionsTotal: progress.total,
       turns,
@@ -413,6 +679,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       currentAction,
       summary,
       simulation,
+      account,
+      user,
+      conversations,
+      conversationId,
+      navOpen,
+      openConversation,
+      deleteConversation,
+      signIn,
+      signUp,
+      signOut,
       progress,
       turns,
       title,

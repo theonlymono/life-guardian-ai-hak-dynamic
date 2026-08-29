@@ -1,4 +1,4 @@
-import { MongoClient, type Collection } from "mongodb";
+import { MongoClient, type Collection, type Db } from "mongodb";
 import type { ChatLogRequest } from "@/lib/types/api";
 
 const DEFAULT_DATABASE = "lifeguardian";
@@ -46,10 +46,26 @@ function getClient(uri: string): Promise<MongoClient> {
   return clientPromise;
 }
 
-async function getCollection(uri: string): Promise<Collection<ChatMessageDocument>> {
-  const client = await getClient(uri);
-  const database = client.db(process.env.MONGODB_DB || DEFAULT_DATABASE);
+async function getCollection(): Promise<Collection<ChatMessageDocument>> {
+  const database = await getDatabase();
+  if (!database) throw new Error("MONGODB_URI is not configured");
   return database.collection<ChatMessageDocument>(COLLECTION);
+}
+
+/**
+ * Shared handle for everything else that needs Atlas. Returns null rather than
+ * throwing when the URI is absent, so callers can degrade instead of failing.
+ */
+export async function getDatabase(): Promise<Db | null> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) return null;
+
+  try {
+    const client = await getClient(uri);
+    return client.db(process.env.MONGODB_DB || DEFAULT_DATABASE);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -61,7 +77,7 @@ export async function storeChatTurn(payload: ChatLogRequest): Promise<boolean> {
   if (!uri) return false;
 
   try {
-    const collection = await getCollection(uri);
+    const collection = await getCollection();
     await collection.insertOne({
       sessionId: payload.sessionId,
       language: payload.language ?? "en",

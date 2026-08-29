@@ -190,6 +190,9 @@ export const lifeSummarySchema = z.object({
 
 export const chatLogRequestSchema = z.object({
   sessionId: z.string().trim().min(1).max(200),
+  // Device-local and self-asserted. It groups a person's own turns and grants
+  // nothing, so it is never treated as proof of who is asking.
+  accountId: z.string().trim().min(1).max(200).optional(),
   language: supportedLanguageSchema.optional(),
   kind: z.enum(["analyze", "answer", "update"]),
   userText: z.string().max(8000).default(""),
