@@ -31,7 +31,6 @@ function statusFor(code: ApiErrorCode): number {
     case "AI_ANALYSIS_FAILED":
     case "INVALID_AI_RESPONSE":
       return 502;
-    case "ELEVENLABS_FAILED":
     case "N8N_UNAVAILABLE":
       return 200;
     default:

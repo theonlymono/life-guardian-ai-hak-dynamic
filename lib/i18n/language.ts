@@ -38,10 +38,6 @@ const ERROR_MESSAGES: Record<ApiErrorCode, Record<SupportedLanguage, string>> = 
     en: "We couldn't turn that update into a reliable next step yet.",
     my: "အခု အချက်အလက်ကနေ ယုံကြည်ရတဲ့ နောက်တစ်ဆင့်ကို မဖန်တီးနိုင်သေးပါဘူး။",
   },
-  ELEVENLABS_FAILED: {
-    en: "Voice is unavailable, but text output is ready.",
-    my: "အသံဖွင့်လို့ မရသေးပေမယ့် စာသားအဖြေက အဆင်သင့်ရှိပါတယ်။",
-  },
   N8N_UNAVAILABLE: {
     en: "Follow-up automation is unavailable right now.",
     my: "နောက်ဆက်တွဲ အသိပေးချက်ကို အခု မပို့နိုင်သေးပါဘူး။",

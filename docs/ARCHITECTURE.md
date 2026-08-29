@@ -31,7 +31,6 @@ There is no customer database in the MVP. Frontend sends `LifeContext` with each
 | Dependency | If it fails |
 |---|---|
 | AI provider | `AI_NOT_CONFIGURED` / `AI_ANALYSIS_FAILED`, or labeled `DEMO_BACKUP_MODE` |
-| ElevenLabs | Text remains; `/api/speak` returns `fallback: "text"` |
 | n8n | `/api/complete-action` still succeeds; `/api/follow-up` reports `unavailable` |
 | Localization | Explicit `language` wins; otherwise detect Myanmar script; else English |
 
@@ -47,7 +46,6 @@ Next.js App Router route handlers deploy as Netlify Functions via the Next runti
 
 - **Cursor** — backend engineering, prompts, tests, docs
 - **n8n** — follow-up orchestration, not the reasoning brain
-- **ElevenLabs** — TTS only
 - **Wispr Flow** — development productivity (voice prompting / iteration), not a production backend
 - **Mobbin** — UX inspiration used by the frontend teammate
 - **Netlify** — public web deployment

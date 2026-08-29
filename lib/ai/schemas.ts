@@ -152,11 +152,6 @@ export const lifeUpdateRequestSchema = z.object({
   context: lifeContextSchema,
 });
 
-export const speakRequestSchema = z.object({
-  language: supportedLanguageSchema.optional(),
-  text: z.string().trim().min(1).max(4000),
-});
-
 export const followUpRequestSchema = z.object({
   sessionId: z.string().trim().min(1).max(200),
   language: supportedLanguageSchema.optional(),

@@ -16,7 +16,7 @@ All endpoints return JSON. Human-readable strings follow `language: "en" | "my"`
 }
 ```
 
-Codes: `INVALID_REQUEST`, `AI_NOT_CONFIGURED`, `AI_ANALYSIS_FAILED`, `INVALID_AI_RESPONSE`, `ELEVENLABS_FAILED`, `N8N_UNAVAILABLE`, `INTERNAL_ERROR`.
+Codes: `INVALID_REQUEST`, `AI_NOT_CONFIGURED`, `AI_ANALYSIS_FAILED`, `INVALID_AI_RESPONSE`, `N8N_UNAVAILABLE`, `INTERNAL_ERROR`.
 
 ---
 
@@ -32,7 +32,6 @@ Liveness and configuration flags. Never returns secrets.
   "service": "Life Guardian AI",
   "timestamp": "2026-08-29T05:00:00.000Z",
   "aiConfigured": true,
-  "elevenLabsConfigured": false,
   "n8nConfigured": false,
   "demoBackupMode": false
 }
@@ -171,46 +170,6 @@ Merges a new natural-language update into existing context. Does not erase previ
 
 ---
 
-## POST `/api/speak`
-
-Server-side ElevenLabs TTS. Never expose the API key.
-
-### Request
-
-```json
-{
-  "language": "en",
-  "text": "Your most useful action today is ready."
-}
-```
-
-### Success
-
-```json
-{
-  "success": true,
-  "language": "en",
-  "contentType": "audio/mpeg",
-  "audioBase64": "<base64>"
-}
-```
-
-### Fallback (voice unavailable)
-
-HTTP 200:
-
-```json
-{
-  "success": false,
-  "fallback": "text",
-  "message": "Voice is unavailable, but text output is ready."
-}
-```
-
-Frontend should keep showing `assistantMessage` text.
-
----
-
 ## POST `/api/follow-up`
 
 Forwards an engagement event to n8n. Core product must not depend on this succeeding.
@@ -253,4 +212,3 @@ Forwards an engagement event to n8n. Core product must not depend on this succee
 2. Language switching does not change scores or category keys — only human-readable strings.
 3. After `complete-action`, replace stored context with `updatedContext` and render `nextAction`.
 4. Optional: after a completed action, call `/api/follow-up` in the background. Ignore `unavailable`.
-5. Optional: call `/api/speak` with `assistantMessage`. If it falls back, do nothing visual besides text.
