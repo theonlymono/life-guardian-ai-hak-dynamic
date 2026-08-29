@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/risk/engine.test.ts lib/engagement/repetition.test.ts lib/engagement/limits.test.ts lib/engagement/context-merge.test.ts lib/ai/schemas.test.ts lib/ai/reasoning.test.ts lib/i18n/language.test.ts lib/i18n/money.test.ts lib/engagement/units.test.ts lib/account/storage.test.ts lib/auth/password.test.ts lib/products/match.test.ts lib/simulation/goal.test.ts lib/simulation/resolve.test.ts lib/integrations/n8n.test.ts"
+    "test": "tsx --test lib/risk/engine.test.ts lib/engagement/repetition.test.ts lib/engagement/limits.test.ts lib/engagement/context-merge.test.ts lib/ai/schemas.test.ts lib/ai/reasoning.test.ts lib/ai/client.test.ts lib/i18n/language.test.ts lib/i18n/money.test.ts lib/engagement/units.test.ts lib/account/storage.test.ts lib/auth/password.test.ts lib/products/match.test.ts lib/simulation/goal.test.ts lib/simulation/resolve.test.ts lib/integrations/n8n.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
