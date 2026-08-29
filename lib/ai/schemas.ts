@@ -172,7 +172,18 @@ export const lifeSummarySchema = z.object({
     )
     .min(1)
     .max(4),
-  nextStep: z.string().min(1).max(1000),
+  plan: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(200),
+        detail: z.string().min(1).max(800),
+        timeframe: z.string().min(1).max(120),
+        basedOn: z.string().min(1).max(400),
+      }),
+    )
+    .min(1)
+    .max(4),
+  caution: z.string().min(1).max(1000),
 });
 
 export const chatLogRequestSchema = z.object({

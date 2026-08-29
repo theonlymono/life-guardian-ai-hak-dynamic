@@ -207,7 +207,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               args.summary.headline,
               args.summary.situation,
               ...args.summary.priorities.map((item) => `${item.focus}: ${item.why}`),
-              args.summary.nextStep,
+              ...args.summary.plan.map(
+                (step, index) =>
+                  `${index + 1}. ${step.title} (${step.timeframe}) — ${step.detail}`,
+              ),
+              args.summary.caution,
             ].join("\n\n")
           : args.assistantText,
         action: args.action

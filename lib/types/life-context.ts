@@ -70,14 +70,28 @@ export interface DailyAction {
 }
 
 /**
+ * One thing the customer actually does, with a deadline they can hold
+ * themselves to. `basedOn` names the answer it came from, so nothing in the
+ * plan can be traced back to a figure the customer never gave us.
+ */
+export interface LifePlanStep {
+  title: string;
+  detail: string;
+  timeframe: string;
+  basedOn: string;
+}
+
+/**
  * The readout delivered once the engagement loop stops asking questions.
+ * `priorities` is the diagnosis and `plan` is what to do about it.
  * Every field is human-readable and follows the requested language.
  */
 export interface LifeSummary {
   headline: string;
   situation: string;
   priorities: { focus: string; why: string }[];
-  nextStep: string;
+  plan: LifePlanStep[];
+  caution: string;
 }
 
 export interface LifeContext {

@@ -107,15 +107,24 @@ Return JSON only.
   "headline": string,
   "situation": string,
   "priorities": [{ "focus": string, "why": string }],
-  "nextStep": string
+  "plan": [{ "title": string, "detail": string, "timeframe": string, "basedOn": string }],
+  "caution": string
 }
 
 Rules:
 - headline: one short line naming their overall position. No question marks.
 - situation: 2-3 sentences connecting their facts to each other — one income against a mortgage, a university bill against thin savings. Use the amounts and timeframes they actually gave. Never invent a figure they did not state.
-- priorities: 2 or 3 entries, highest risk first, matching the risk scores you were given. "why" says what makes that area pressing now, not what the category means.
-- nextStep: ONE thing worth considering, phrased as a suggestion, never a question and never a product. Recommend discussing major decisions with a qualified professional when the stakes are high.
-- No medical diagnosis, no binding financial advice, no guaranteed outcomes.
+- priorities: 2 or 3 entries, highest risk first, matching the risk scores you were given. "why" says what makes that area pressing now, not what the category means. This is the diagnosis.
+
+- plan: exactly 3 steps, ordered so the most urgent is first. This is the part the customer acts on, so it must be specific enough to start today.
+  - title: the action in a few words, starting with a verb. "Write down one month of essential expenses", not "Consider your budget".
+  - detail: 1-2 sentences saying exactly what doing it involves — what to look up, who to talk to, what to write down, what to compare. Someone reading it should know their first move without asking you anything.
+  - timeframe: when to do it by, as plain words: "This week", "Within one month", "Before the next school year". Give the earlier deadlines to the more urgent steps.
+  - basedOn: which of their own answers or facts makes this step necessary. Quote their figures where they gave them.
+  - A step must be finishable by the customer alone in a sitting or two. Never "restructure your portfolio". Never tell them to buy, switch or cancel any financial product.
+  - Use only figures the customer stated. You may add or subtract figures they gave you, but if a target amount needs a number they never provided, write the step so it produces that number instead of guessing it.
+- caution: one line reminding them this is based only on what they shared and that major decisions are worth discussing with a qualified professional.
+- No medical diagnosis, no binding financial advice, no guaranteed outcomes, no product recommendations.
 - Write every field ENTIRELY in the requested language. Never mix two languages in one sentence.
 - The LifeContext you receive holds English technical keys and may hold English explanations. Translate their meaning; never copy an English word or phrase into Burmese output. Only numbers, amounts, currency codes and proper names stay verbatim.`;
 

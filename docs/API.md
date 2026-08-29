@@ -158,7 +158,7 @@ Same standard error object. Action completion still succeeds in the product even
 | --- | --- |
 | `questionsAnswered` | Answers recorded so far, equal to `context.completedActions.length` |
 | `questionsTotal` | The cap. Constant per deployment; read it rather than hardcoding 5 |
-| `summary` | `null` while questions remain; the closing readout once the cap is reached |
+| `summary` | `null` while questions remain; the closing readout and plan once the cap is reached |
 
 While `questionsAnswered < questionsTotal`: the action field is populated and `summary` is `null`.
 
@@ -176,18 +176,30 @@ At the cap: the action field is `null` and `summary` is populated. The two are n
     "situation": "Your household relies on a single income while managing a remaining mortgage of 35,000,000 JPY...",
     "priorities": [
       {
-        "focus": "Financial resilience and emergency savings",
-        "why": "Your current savings cover fewer than three months of essentials..."
+        "focus": "Finance",
+        "why": "Relying on a single income with emergency savings covering only one month..."
       }
     ],
-    "nextStep": "It is worth considering building a dedicated emergency buffer..."
+    "plan": [
+      {
+        "title": "Calculate exact monthly essential expenses",
+        "detail": "Review your bank statements from the past month to list every essential expense, then multiply that total by three to establish a clear emergency fund target.",
+        "timeframe": "This week",
+        "basedOn": "Your emergency savings currently cover only one month of essential expenses."
+      }
+    ],
+    "caution": "This is based only on what you shared here. Any major decision is worth discussing with a qualified professional."
   }
 }
 ```
 
+`priorities` is the diagnosis — the ranked areas and why each is pressing. `plan` is what the customer does about it: **3 ordered steps**, most urgent first, each with a `timeframe` and a `basedOn` naming the answer that makes it necessary.
+
+Every step is finishable alone in a sitting and produces a fact the customer did not have. Steps never recommend buying, switching or cancelling a financial product, and never contain a figure the customer did not state.
+
 After the cap the customer can still send `/api/life-update`. New information regenerates the summary rather than reopening the questions.
 
-If the model is unavailable or rate-limited, the summary is built deterministically from the risk engine instead, so this response never fails to arrive. Localized the same way as everything else: `focus` values are human-readable labels here, not the `RiskCategory` enum.
+If the model is unavailable or rate-limited, the whole summary — plan included — is built deterministically from the risk engine, so this response never fails to arrive. Localized like everything else: `focus` values are human-readable labels here, not the `RiskCategory` enum.
 
 ---
 

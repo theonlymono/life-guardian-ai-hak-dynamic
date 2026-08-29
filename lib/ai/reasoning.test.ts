@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { generateSummary, hasEnoughContext, isCleanForLanguage } from "./reasoning";
+import {
+  dropUnsupportedNumbers,
+  generateSummary,
+  hasEnoughContext,
+  isCleanForLanguage,
+} from "./reasoning";
+import type { AnswerInterpretation } from "./schemas";
 import { emptyLifeContext } from "../types/life-context";
 import { calculateRisks } from "../risk/engine";
 import type { LifeContext, SupportedLanguage } from "../types/life-context";
@@ -58,6 +64,56 @@ test("English output is never rejected by the script guard", () => {
   assert.equal(isCleanForLanguage("How many months of expenses?", "en"), true);
 });
 
+function interpretation(overrides: Partial<AnswerInterpretation> = {}): AnswerInterpretation {
+  return {
+    interpretedAnswer: 0,
+    profileUpdates: {},
+    newLifeEvents: [],
+    newCommitments: [],
+    resolvedUnknowns: ["emergency savings"],
+    newlyUnknown: [],
+    ...overrides,
+  };
+}
+
+test("a vague answer is never recorded as the number zero", () => {
+  const cleaned = dropUnsupportedNumbers(
+    interpretation({
+      newCommitments: [
+        { type: "emergency_savings", amount: 0, description: "Emergency savings" },
+      ],
+    }),
+    "It is something I am working on.",
+  );
+
+  assert.equal(cleaned.interpretedAnswer, "It is something I am working on.");
+  assert.deepEqual(cleaned.newCommitments, []);
+  // Still unanswered, so the loop may ask about it again.
+  assert.deepEqual(cleaned.resolvedUnknowns, []);
+});
+
+test("a real figure survives untouched in either language", () => {
+  for (const answer of ["2", "About two months", "၂ လ", "I have none saved", "မရှိပါဘူး"]) {
+    const cleaned = dropUnsupportedNumbers(interpretation({ interpretedAnswer: 2 }), answer);
+    assert.equal(cleaned.interpretedAnswer, 2, `lost the figure in "${answer}"`);
+    assert.deepEqual(cleaned.resolvedUnknowns, ["emergency savings"]);
+  }
+});
+
+test("a numeric answer from the UI is always trusted", () => {
+  const cleaned = dropUnsupportedNumbers(interpretation({ interpretedAnswer: 0 }), 0);
+  assert.equal(cleaned.interpretedAnswer, 0);
+});
+
+test("an age the customer never stated is not invented from a vague reply", () => {
+  const cleaned = dropUnsupportedNumbers(
+    interpretation({ interpretedAnswer: "yes", profileUpdates: { age: 42, dependents: 2 } }),
+    "Yes, that is right.",
+  );
+  assert.equal(cleaned.profileUpdates.age, undefined);
+  assert.equal(cleaned.profileUpdates.dependents, undefined);
+});
+
 test("rejects a single foreign glyph hidden inside a Burmese word", () => {
   // Gemini has produced this exact leak: Gurmukhi ਕ inside "တက္ကသိုလ်".
   assert.equal(isCleanForLanguage("နောက်နှစ်နှစ်အတွင်း တက္ਕသိုလ်တက်မည်", "my"), false);
@@ -93,7 +149,32 @@ test("the offline summary ranks real categories instead of leaking enum keys", a
     assert.equal(/^(finance|healthCare|education|housing|family)$/.test(priority.focus), false);
     assert.ok(priority.why.length > 0);
   }
-  assert.match(summary.nextStep, /qualified professional/);
+  assert.match(summary.caution, /qualified professional/);
+});
+
+test("the offline plan gives ordered steps with deadlines and a reason each", async () => {
+  const { summary } = await generateSummary(scoredContext("en"), "en");
+
+  assert.ok(summary.plan.length >= 2, "a plan of one step is not a plan");
+  const seen = new Set<string>();
+  for (const step of summary.plan) {
+    assert.ok(step.timeframe.length > 0, "every step needs a deadline");
+    assert.ok(step.basedOn.length > 0, "every step must trace back to an answer");
+    // A step that only says "consider your options" is not actionable.
+    assert.ok(step.detail.split(" ").length > 8);
+    assert.equal(seen.has(step.title), false, "steps must not repeat");
+    seen.add(step.title);
+  }
+  // The most urgent risk is addressed first.
+  assert.equal(summary.plan[0].timeframe, "This week");
+});
+
+test("the offline plan never tells the customer to buy a financial product", async () => {
+  for (const language of ["en", "my"] as const) {
+    const { summary } = await generateSummary(scoredContext(language), language);
+    const text = summary.plan.map((step) => `${step.title} ${step.detail}`).join(" ");
+    assert.doesNotMatch(text, /\b(buy|purchase|sign up for|invest in|switch to)\b/i);
+  }
 });
 
 test("the offline summary is written in Burmese when Burmese is requested", async () => {
@@ -101,8 +182,9 @@ test("the offline summary is written in Burmese when Burmese is requested", asyn
   const text = [
     summary.headline,
     summary.situation,
-    summary.nextStep,
+    summary.caution,
     ...summary.priorities.map((item) => `${item.focus} ${item.why}`),
+    ...summary.plan.map((step) => `${step.title} ${step.detail} ${step.timeframe} ${step.basedOn}`),
   ].join(" ");
 
   assert.match(text, /[\u1000-\u109F]/);

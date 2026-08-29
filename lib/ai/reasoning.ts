@@ -15,7 +15,8 @@ import {
   summaryUserPrompt,
 } from "@/lib/ai/prompts";
 import { selectFallbackAction } from "@/lib/engagement/daily-action";
-import { categoryLabel } from "@/lib/risk/engine";
+import { fallbackSummary } from "@/lib/engagement/summary-fallback";
+import { hasNumericEvidence } from "@/lib/risk/engine";
 import {
   completedTopicKeys,
   fallbackPressureQuestion,
@@ -171,8 +172,11 @@ export async function generateSummary(
     const text = [
       parsed.data.headline,
       parsed.data.situation,
-      parsed.data.nextStep,
+      parsed.data.caution,
       ...parsed.data.priorities.map((item) => `${item.focus} ${item.why}`),
+      ...parsed.data.plan.map(
+        (step) => `${step.title} ${step.detail} ${step.timeframe} ${step.basedOn}`,
+      ),
     ].join(" ");
     if (!isCleanForLanguage(text, language)) {
       return { summary: fallback, source: "live_ai" };
@@ -191,68 +195,6 @@ export function summaryLeadIn(language: SupportedLanguage): string {
   return language === "my"
     ? "မေးခွန်းများ ဖြေပြီးသွားပါပြီ။ သင်ပြောပြထားသမျှကို ပေါင်းစပ်ပြီး အခြေအနေ တစ်ခုလုံးကို အနှစ်ချုပ် ပြောပြပါမည်။"
     : "That is everything I need to ask. Here is what your answers add up to.";
-}
-
-const LATIN_TO_MYANMAR_DIGITS = "၀၁၂၃၄၅၆၇၈၉";
-
-function localizeNumber(value: number, language: SupportedLanguage): string {
-  const text = String(value);
-  if (language !== "my") return text;
-  return text.replace(/\d/g, (digit) => LATIN_TO_MYANMAR_DIGITS[Number(digit)]);
-}
-
-/**
- * Built entirely from the deterministic risk engine, so the customer still
- * gets a real readout when the model is rate-limited or down. Uses the
- * contributing factors rather than the full risk explanation, because the
- * explanation carries a disclaimer suffix that would repeat on every line.
- */
-function fallbackSummary(context: LifeContext, language: SupportedLanguage): LifeSummary {
-  const top = [...context.risks]
-    .filter((risk) => risk.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
-  const answered = localizeNumber(context.completedActions.length, language);
-  const leadLabel = top.length ? categoryLabel(top[0].category, language) : null;
-
-  const priorities = top.length
-    ? top.map((risk) => ({
-        focus: categoryLabel(risk.category, language),
-        why: risk.contributingFactors.length
-          ? risk.contributingFactors.join(" ")
-          : risk.explanation,
-      }))
-    : [
-        {
-          focus: language === "my" ? "အချက်အလက် ဖြည့်စွက်ရန်" : "Filling in the picture",
-          why:
-            language === "my"
-              ? "ဦးစားပေးအဆင့် သတ်မှတ်ရန် အချက်အလက် လုံလောက်စွာ မရသေးပါ။"
-              : "There is not yet enough detail to rank one area above another.",
-        },
-      ];
-
-  if (language === "my") {
-    return {
-      headline: leadLabel
-        ? `သင့်အခြေအနေတွင် ${leadLabel} က အရေးအကြီးဆုံး ဖြစ်နေပါသည်`
-        : "သင်ပြောပြထားချက်များအရ လက်ရှိအခြေအနေ",
-      situation: `မေးခွန်း ${answered} ခုကို ဖြေပြီးပါပြီ။ ထိုအဖြေများအရ အောက်ပါနယ်ပယ်များကို အစဉ်လိုက် ဦးစားပေး ကြည့်သင့်ပါသည်။ ဤဂဏန်းများသည် ဘယ်အရာကို အရင်ကြည့်သင့်သည်ကို ပြသည့် အညွှန်းသာ ဖြစ်ပြီး မလုံခြုံမှု ရာခိုင်နှုန်း မဟုတ်ပါ။`,
-      priorities,
-      nextStep:
-        "အထက်ပါ ဦးစားပေးအချက်များကို အရေးကြီးသော ငွေကြေးဆုံးဖြတ်ချက် မချမီ ကျွမ်းကျင်သူတစ်ဦးနှင့် တိုင်ပင်ဆွေးနွေးရန် စဉ်းစားနိုင်ပါသည်။",
-    };
-  }
-
-  return {
-    headline: leadLabel
-      ? `${leadLabel} is what your answers point to first`
-      : "Where you stand, based on what you shared",
-    situation: `You answered ${answered} questions. Those answers rank the areas below in the order worth your attention. These numbers are a sequencing signal, not a measure of being unsafe.`,
-    priorities,
-    nextStep:
-      "You may want to review these priorities with a qualified professional before making any major decision.",
-  };
 }
 
 export async function interpretAnswer(args: {
@@ -277,10 +219,44 @@ export async function interpretAnswer(args: {
     if (!parsed.success) {
       throw new Error("INVALID_AI_RESPONSE");
     }
-    return parsed.data;
+    return dropUnsupportedNumbers(parsed.data, args.answer);
   } catch {
     return heuristicInterpretation(args);
   }
+}
+
+/**
+ * Strips figures the model produced from an answer that contains no figure.
+ *
+ * Asked how many months of expenses they have saved, a customer who replies
+ * "it's something I'm working on" has told us nothing, but the model reads it
+ * as 0. Stored, that zero fires the emergency-savings rule, adds 25 to their
+ * finance score, and comes back in the closing summary as "you have no
+ * emergency savings" — a figure they never gave, presented as their own.
+ */
+export function dropUnsupportedNumbers(
+  interpretation: AnswerInterpretation,
+  answer: string | number | boolean,
+): AnswerInterpretation {
+  if (typeof answer !== "string" || hasNumericEvidence(answer)) return interpretation;
+
+  const profileUpdates = { ...interpretation.profileUpdates };
+  delete profileUpdates.age;
+  delete profileUpdates.dependents;
+
+  return {
+    ...interpretation,
+    interpretedAnswer:
+      typeof interpretation.interpretedAnswer === "number"
+        ? answer
+        : interpretation.interpretedAnswer,
+    profileUpdates,
+    newCommitments: interpretation.newCommitments.filter(
+      (commitment) => commitment.amount === undefined,
+    ),
+    // The question stays open: an answer without the figure has not resolved it.
+    resolvedUnknowns: [],
+  };
 }
 
 function draftToAction(draft: DailyActionDraft): DailyAction {

@@ -252,6 +252,26 @@ function matchQuantity(
   return undefined;
 }
 
+/** Words that state a quantity of zero, which digits alone would miss. */
+const ZERO_WORDS =
+  /\b(zero|none|nothing|nil|no savings|not any)\b|မရှိ|မစုရသေး|တစ်ခုမှမ/i;
+
+/**
+ * True when the text actually contains a quantity — digits in either script, a
+ * spelled-out number, or an explicit statement of none.
+ *
+ * Used to check a model's numeric reading against what the customer really
+ * wrote. "I'm working on it" is not zero, and recording it as zero would move
+ * their risk score on a figure they never gave.
+ */
+export function hasNumericEvidence(text: string): boolean {
+  const normalized = myanmarDigitsToLatin(text);
+  if (/\d/.test(normalized)) return true;
+  if (ZERO_WORDS.test(normalized)) return true;
+  if (new RegExp(`\\b(${LATIN_WORD_PATTERN})\\b`, "i").test(normalized)) return true;
+  return new RegExp(`(${MYANMAR_WORD_PATTERN})`).test(normalized);
+}
+
 export function parseYearHorizon(timeHorizon: string): number | undefined {
   const years = matchQuantity(timeHorizon, "years?|yrs?", "နှစ်");
   if (years !== undefined) return years;

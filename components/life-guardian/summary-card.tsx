@@ -51,21 +51,49 @@ export function SummaryCard() {
         </ol>
       </div>
 
-      <div className="mt-5 flex gap-2.5 rounded-xl bg-[#f7f8f9] px-4 py-3">
-        <HugeiconsIcon
-          icon={IdeaIcon}
-          strokeWidth={1.5}
-          className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-        />
-        <div className="min-w-0">
-          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {copy.considerNext}
-          </div>
-          <p className="text-[13px] leading-relaxed text-foreground">{summary.nextStep}</p>
+      <div className="mt-5">
+        <div className="mb-2.5 flex items-center gap-1.5">
+          <HugeiconsIcon
+            icon={IdeaIcon}
+            strokeWidth={1.5}
+            className="size-3.5 shrink-0 text-[#0084ff]"
+          />
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {copy.yourPlan}
+          </span>
         </div>
+
+        <ol className="space-y-2">
+          {summary.plan.map((step, index) => (
+            <li
+              key={`${step.title}-${index}`}
+              className="rounded-xl border border-border/50 bg-[#f7f8f9] px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-2.5">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-white text-[11px] font-semibold leading-none text-foreground">
+                    {index + 1}
+                  </span>
+                  <h3 className="min-w-0 text-sm font-medium text-foreground">{step.title}</h3>
+                </div>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {step.timeframe}
+                </span>
+              </div>
+
+              <p className="mt-1.5 pl-[30px] text-[13px] leading-relaxed text-foreground">
+                {step.detail}
+              </p>
+              <p className="mt-1.5 pl-[30px] text-[11px] leading-relaxed text-muted-foreground">
+                <span className="font-medium">{copy.basedOn}:</span> {step.basedOn}
+              </p>
+            </li>
+          ))}
+        </ol>
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">{summary.caution}</p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
         {copy.summaryFooter}
       </p>
     </div>

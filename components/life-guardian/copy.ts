@@ -42,9 +42,9 @@ export const UI_COPY = {
     of: "of",
     summaryDone: "All questions answered",
     whatMattersMost: "What matters most",
-    considerNext: "Worth considering",
-    summaryFooter:
-      "Tell me anything that changes and I will update this. Life Guardian is not a financial adviser.",
+    yourPlan: "Your plan",
+    basedOn: "Because",
+    summaryFooter: "Tell me anything that changes and I will update this plan.",
 
     lifePulseEmpty: "Share your situation and your Life Pulse appears here.",
     pulseNote: "Scores rank what to look at first. They are not a risk percentage.",
@@ -99,9 +99,9 @@ export const UI_COPY = {
     of: "/",
     summaryDone: "မေးခွန်းအားလုံး ဖြေပြီးပါပြီ",
     whatMattersMost: "အရေးအကြီးဆုံး",
-    considerNext: "စဉ်းစားသင့်သည်",
-    summaryFooter:
-      "ပြောင်းလဲမှုရှိရင် ပြောပြပါ၊ ဒါကို ပြန်မွမ်းမံပေးမည်။ Life Guardian သည် ငွေကြေးအကြံပေးပညာရှင် မဟုတ်ပါ။",
+    yourPlan: "သင်လုပ်ရမည့် အစီအစဉ်",
+    basedOn: "အကြောင်းရင်း",
+    summaryFooter: "ပြောင်းလဲမှုရှိပါက ပြောပြပါ၊ ဤအစီအစဉ်ကို ပြန်မွမ်းမံပေးပါမည်။",
 
     lifePulseEmpty: "အခြေအနေ ပြောပြပါ၊ ဘဝအခြေအနေ ဒီမှာ ပေါ်လာမည်။",
     pulseNote: "အမှတ်များက ဘာကို အရင်ကြည့်ရမလဲ အစီအစဉ်ချပေးသည်။ အန္တရာယ် ရာခိုင်နှုန်း မဟုတ်ပါ။",
