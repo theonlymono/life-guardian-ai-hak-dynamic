@@ -78,11 +78,37 @@ Create `.env.local` (never commit real values):
 | `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | Optional | Override to use another OpenAI-compatible provider or Netlify AI Gateway |
 | `N8N_LIFE_GUARDIAN_WEBHOOK_URL` | v2 pipeline | Workflow stays optional |
 | `N8N_WEBHOOK_URL` | Follow-up | Workflow stays optional |
+| `MONGODB_URI` | Chat archive | Atlas `mongodb+srv://` string. When set, turns are written directly and the n8n chat-log webhook is skipped. |
+| `MONGODB_DB` | Optional | Default `lifeguardian` |
+| `N8N_CHAT_LOG_WEBHOOK_URL` | Chat archive | Fallback route used only when `MONGODB_URI` is unset |
 | `DEMO_BACKUP_MODE` | Demo safety | `true` enables a labeled deterministic backup. Responses include `"source": "demo_backup"`. |
 
 **Provide at minimum:** `GEMINI_API_KEY`.
 
 For n8n: `N8N_LIFE_GUARDIAN_WEBHOOK_URL` and `N8N_WEBHOOK_URL`, both pointing at published workflows.
+
+## Chat archive
+
+Every turn is stored in the `chat_messages` collection with the risk snapshot and any score movement, which is what turns the KPIs below into real queries:
+
+```js
+db.chat_messages.aggregate([
+  { $group: {
+      _id: "$sessionId",
+      turns: { $sum: 1 },
+      actionsAnswered: { $sum: { $cond: [{ $eq: ["$kind", "answer"] }, 1, 0] } },
+      lastSeen: { $max: "$createdAt" }
+  } }
+])
+```
+
+Indexes: `session_timeline` (`sessionId`, `createdAt`) to replay one conversation, `recent_first` (`createdAt` descending) for activity windows.
+
+Archiving never affects the customer. The browser fires the call without awaiting it and every failure returns `stored: false`. Replay a full session against a running server with:
+
+```bash
+node scripts/verify-chat-log.mjs
+```
 
 ## Netlify
 
@@ -102,6 +128,7 @@ Set the same environment variables in the Netlify UI. Do not prefix secrets with
 | n8n | Follow-up / engagement orchestration after an action is completed |
 | Wispr Flow | Voice-driven development (prompting, iteration, docs) and voice input during the demo, via OS-level dictation — **not** an API integration |
 | Mobbin | UX inspiration for information hierarchy and daily engagement patterns (frontend teammate) |
+| MongoDB Atlas | Stores every chat turn with its risk snapshot, making the engagement KPIs below measurable |
 | Netlify | Public web deployment |
 | Google Gemini (`gemini-3.5-flash-lite`) | Natural-language extraction and personalized wording |
 

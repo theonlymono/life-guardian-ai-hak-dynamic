@@ -63,14 +63,22 @@ Every conversation turn is archived as one document in the `chat_messages` colle
 
 This path is logging only. `Store Chat Message` is set to `continueRegularOutput`, so a database failure still returns a webhook response, and `POST /api/log-turn` reports `stored: false` rather than failing. The browser calls it without awaiting: losing an audit record must never interrupt a customer.
 
-### Setup
+### Two routes, one write
 
-The workflow ships with an unfilled `mongoDb` credential placeholder named **MongoDB Atlas - LifeGuideDB**, because credentials cannot be created through the API. To finish it:
+`logChatTurn` picks exactly one route, so a turn is never stored twice:
+
+1. **`MONGODB_URI` set** — the app writes straight to Atlas with the official driver. This is the active path. It removes a network hop and needs no n8n credential.
+2. **Otherwise, `N8N_CHAT_LOG_WEBHOOK_URL` set** — the workflow above does the write, keeping database credentials out of the app.
+3. **Neither** — logging is skipped and `stored: false` is returned.
+
+### Enabling the n8n route
+
+The workflow is built but **not published**, because it carries an unfilled `mongoDb` credential placeholder named **MongoDB Atlas - LifeGuideDB** and credentials cannot be created through the API. Publishing is rejected with `Missing required credential: mongoDb` until it is filled. To finish it:
 
 1. In n8n, open the workflow and select **Store Chat Message**.
-2. Create the credential with **Configuration Type: Connection String**, the Atlas `mongodb+srv://` URI with the real username substituted for `<db_username>`, and a **Database** name.
-3. In Atlas, add the n8n Cloud egress IP under **Network Access**. This is the most common cause of a connection timeout here.
-4. Publish the workflow, then set `N8N_CHAT_LOG_WEBHOOK_URL` to its production URL.
+2. Create the credential with **Configuration Type: Connection String**, the Atlas `mongodb+srv://` URI with the real username substituted for `<db_username>`, and **Database** `lifeguardian`.
+3. Atlas **Network Access** already accepts the connection — verified with `mongosh` from outside the cluster — so no IP change is needed.
+4. Publish the workflow, then unset `MONGODB_URI` so this route takes over.
 
 Source of truth for v2 lives in `n8n/life-guardian-compact.js`.
 

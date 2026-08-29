@@ -1,18 +1,30 @@
 import type { ChatLogRequest } from "@/lib/types/api";
+import { isMongoConfigured, storeChatTurn } from "./mongo";
 
 export function isChatLogConfigured(): boolean {
-  return Boolean(process.env.N8N_CHAT_LOG_WEBHOOK_URL);
+  return isMongoConfigured() || Boolean(process.env.N8N_CHAT_LOG_WEBHOOK_URL);
 }
 
 /**
- * Sends one conversation turn to the n8n workflow that writes it to MongoDB
- * Atlas. This is an audit trail, not part of the engagement loop: a missing
- * webhook, a broken workflow, or a dead database must never surface to the
- * customer, so every failure resolves to `stored: false`.
+ * Archives one conversation turn.
+ *
+ * Two routes exist and exactly one runs, so a turn is never stored twice. The
+ * direct Atlas write wins when `MONGODB_URI` is set because it removes a
+ * network hop; the n8n webhook is the fallback for deployments that would
+ * rather keep database credentials out of the app entirely.
+ *
+ * This is an audit trail, not part of the engagement loop: a missing config, a
+ * broken workflow, or a dead database must never surface to the customer, so
+ * every failure resolves to `stored: false`.
  */
 export async function logChatTurn(
   payload: ChatLogRequest,
 ): Promise<{ success: boolean; stored: boolean }> {
+  if (isMongoConfigured()) {
+    const stored = await storeChatTurn(payload);
+    return { success: stored, stored };
+  }
+
   const url = process.env.N8N_CHAT_LOG_WEBHOOK_URL;
   if (!url) {
     return { success: false, stored: false };
