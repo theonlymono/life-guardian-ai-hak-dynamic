@@ -10,9 +10,9 @@ import {
 } from "@hugeicons/core-free-icons"
 
 const suggestions = [
-  { label: "Create a slide deck", icon: Presentation01Icon },
-  { label: "Research a market", icon: Analytics01Icon },
-  { label: "Create an interactive mood board", icon: PaintBoardIcon },
+  { label: "Share my family situation", icon: Presentation01Icon },
+  { label: "Plan for education", icon: Analytics01Icon },
+  { label: "I have a housing concern", icon: PaintBoardIcon },
 ]
 
 export function SuggestionChips() {

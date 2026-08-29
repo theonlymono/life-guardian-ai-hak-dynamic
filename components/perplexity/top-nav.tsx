@@ -10,7 +10,7 @@ import {
   ViewIcon,
 } from "@hugeicons/core-free-icons"
 
-const categories = ["Discover", "Finance", "Health", "Academic", "Patents"]
+const categories = ["Finance", "Family", "Health", "Education", "Housing"]
 
 export function TopNav() {
   return (

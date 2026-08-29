@@ -13,7 +13,7 @@ import {
 } from "@hugeicons/core-free-icons"
 
 export function PromptBox() {
-  const [value, setValue] = useState("Generate a simple cat meow in audio format")
+  const [value, setValue] = useState("")
 
   return (
     <div className="relative w-full">
@@ -29,7 +29,7 @@ export function PromptBox() {
           onChange={(e) => setValue(e.target.value)}
           rows={3}
           className="w-full resize-none bg-transparent px-5 pt-5 pb-2 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
-          placeholder="Ask anything or describe a task..."
+          placeholder="Tell me what is changing in your life today..."
         />
 
         <div className="flex items-center justify-between px-3 pb-3">
@@ -54,7 +54,7 @@ export function PromptBox() {
               className="h-8 gap-1.5 rounded-full border-border/70 bg-[#f7f8f9] px-3 text-xs font-normal shadow-none"
             >
               <HugeiconsIcon icon={ComputerIcon} strokeWidth={1.5} className="size-3.5" />
-              Computer
+              Companion
               <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.5} className="size-3" />
             </Button>
           </div>
@@ -65,7 +65,7 @@ export function PromptBox() {
               size="sm"
               className="h-8 gap-1 rounded-full border-border/70 bg-[#f7f8f9] px-3 text-xs font-normal shadow-none"
             >
-              GPT-5.5
+              Life Pulse
               <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.5} className="size-3" />
             </Button>
             <Button

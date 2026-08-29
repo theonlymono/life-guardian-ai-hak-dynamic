@@ -6,23 +6,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  ComputerIcon,
-  Folder01Icon,
+  Analytics01Icon,
   File01Icon,
   Settings01Icon,
   Clock01Icon,
   Notification01Icon,
   UserAdd01Icon,
   SidebarLeftIcon,
+  ComputerIcon,
 } from "@hugeicons/core-free-icons"
 import { PerplexityMark } from "./perplexity-logo"
 
 const navItems = [
-  { label: "Computer", icon: ComputerIcon, active: true },
-  { label: "Spaces", icon: Folder01Icon, active: false },
-  { label: "Artifacts", icon: File01Icon, active: false },
-  { label: "Customize", icon: Settings01Icon, active: false },
+  { label: "Today", icon: ComputerIcon, active: true },
+  { label: "Life Pulse", icon: Analytics01Icon, active: false },
+  { label: "Actions", icon: File01Icon, active: false },
   { label: "History", icon: Clock01Icon, active: false },
+  { label: "Settings", icon: Settings01Icon, active: false },
 ]
 
 export function AppSidebar() {
@@ -71,9 +71,9 @@ export function AppSidebar() {
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium">Alex Smith</span>
-              <span className="rounded bg-[#c4a265]/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#9a7b3c]">
-                Pro
+              <span className="truncate text-sm font-medium">Life Companion</span>
+              <span className="rounded bg-[#0084ff]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#003da5]">
+                AI
               </span>
             </div>
           </div>
@@ -87,7 +87,7 @@ export function AppSidebar() {
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-[#eceef0]/60 hover:text-foreground"
         >
           <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={1.5} className="size-4" />
-          Add your team
+          Invite family
         </button>
       </div>
     </aside>

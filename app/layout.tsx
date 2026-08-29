@@ -17,7 +17,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Life Guardian AI",
-  description: "AI-powered assistant interface",
+  description:
+    "An adaptive life companion that understands your changing situation and offers one useful next action each day.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
