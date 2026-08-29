@@ -14,6 +14,7 @@ import {
 import { selectFallbackAction } from "@/lib/engagement/daily-action";
 import {
   completedTopicKeys,
+  fallbackPressureQuestion,
   isRepeatedQuestion,
   withActionId,
 } from "@/lib/engagement/repetition";
@@ -24,11 +25,33 @@ import type {
   SupportedLanguage,
 } from "@/lib/types/life-context";
 
+export function hasEnoughContext(context: LifeContext): boolean {
+  return Boolean(
+    context.profile.age ||
+      context.profile.dependents !== undefined ||
+      context.profile.incomeStructure === "single_income" ||
+      context.lifeEvents.length > 0 ||
+      context.commitments.length > 0 ||
+      context.completedActions.length > 0,
+  );
+}
+
 export async function generateDailyAction(
   context: LifeContext,
   language: SupportedLanguage,
 ): Promise<{ action: DailyAction; assistantMessage: string; source: "live_ai" | "demo_backup" }> {
   const fallback = selectFallbackAction(context, language);
+
+  // Too little to reason about: ask the one clarifying question instead of guessing a topic.
+  if (!hasEnoughContext(context)) {
+    const pressure = fallbackPressureQuestion(language);
+    return {
+      action: pressure,
+      assistantMessage: fallbackAssistantMessage(pressure, language),
+      source: isAiConfigured() ? "live_ai" : "demo_backup",
+    };
+  }
+
   if (!isAiConfigured()) {
     if (isDemoBackupMode()) {
       const demo = demoDailyAction(context, language);
@@ -67,7 +90,16 @@ export async function generateDailyAction(
       throw new Error("INVALID_AI_RESPONSE");
     }
     const action = draftToAction(parsed.data);
-    if (isRepeatedQuestion(action, context)) {
+    const draftText = [
+      action.title,
+      action.reason,
+      action.question,
+      action.expectedImpact,
+      parsed.data.assistantMessage,
+      ...(action.options ?? []),
+    ].join(" ");
+
+    if (isRepeatedQuestion(action, context) || !isCleanForLanguage(draftText, language)) {
       return {
         action: fallback,
         assistantMessage: fallbackAssistantMessage(fallback, language),
@@ -140,9 +172,17 @@ function draftToAction(draft: DailyActionDraft): DailyAction {
 
 function fallbackAssistantMessage(action: DailyAction, language: SupportedLanguage): string {
   if (language === "my") {
-    return `သင်ပြောပြထားတာတွေအပေါ် အခြေခံပြီး ဒီနေ့အတွက် အသုံးဝင်ဆုံး နောက်တစ်ဆင့်က ${action.title} ပါ။ ${action.question}`;
+    return `သင်ပြောပြထားတာတွေအပေါ် အခြေခံပြီး ဒီနေ့အတွက် အသုံးဝင်ဆုံး နောက်တစ်ဆင့်ကတော့ ${action.title} ပါ။ ${action.question}`;
   }
   return `Based on what you shared, one useful next step today is: ${action.question}`;
+}
+
+const NON_BURMESE_SCRIPT = /[\u4E00-\u9FFF\u3040-\u30FF\u0E00-\u0E7F]/;
+
+/** Gemini occasionally leaks CJK/Thai glyphs into Burmese output. Reject those drafts. */
+export function isCleanForLanguage(text: string, language: SupportedLanguage): boolean {
+  if (language !== "my") return true;
+  return !NON_BURMESE_SCRIPT.test(text);
 }
 
 function heuristicInterpretation(args: {

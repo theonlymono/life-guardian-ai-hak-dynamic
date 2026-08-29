@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/risk/engine.test.ts lib/engagement/repetition.test.ts lib/ai/schemas.test.ts lib/i18n/language.test.ts lib/integrations/n8n.test.ts"
+    "test": "tsx --test lib/risk/engine.test.ts lib/engagement/repetition.test.ts lib/ai/schemas.test.ts lib/ai/reasoning.test.ts lib/i18n/language.test.ts lib/integrations/n8n.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

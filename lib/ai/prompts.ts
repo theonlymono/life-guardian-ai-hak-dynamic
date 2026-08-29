@@ -19,6 +19,7 @@ Schema:
 }
 
 Rules:
+- dependents counts children and other people financially supported. Do NOT count a non-working spouse (that is captured by incomeStructure). Do NOT count an aging parent unless the user says they already support them financially.
 - incomeStructure=single_income if the user says a spouse/partner is not working or they are the only earner.
 - Convert currency words like "¥35 million" to amount 35000000 and currency "JPY".
 - Keep type keys in English: education, mortgage, elder_care, job_loss, pregnancy, retirement, housing.
@@ -58,10 +59,14 @@ JSON schema:
 }
 
 topicKey must be a stable English snake_case key such as education_savings, emergency_fund_months, elder_care_shared, retirement_age, current_pressure.
-Human-readable fields must be in the requested language.
 Keep category/technical meaning stable even when language is Myanmar.
 assistantMessage should feel like a companion: understand, prioritize, then ask one useful next step.
-Use wording like "Based on what you shared..." and "One useful next step could be...".`;
+
+Language rules for title, reason, question, options, expectedImpact, and assistantMessage:
+- Write them ENTIRELY in the requested language. Never mix two languages in one sentence.
+- When language is "my", use natural Burmese only. Do not emit Chinese, Japanese, Thai, or Latin characters except for numbers, currency codes, and proper nouns.
+- Do not copy English stock phrases literally into Myanmar. Express "Based on what you shared" and "One useful next step could be" using natural Burmese equivalents.
+- Preserve numbers, amounts, currencies, dates, and names exactly as stated.`;
 
 export function actionUserPrompt(args: {
   language: SupportedLanguage;
@@ -69,7 +74,8 @@ export function actionUserPrompt(args: {
   blockedTopics: string[];
   blockedQuestions: string[];
 }): string {
-  return `Language: ${args.language}
+  const languageName = args.language === "my" ? "Myanmar (Burmese)" : "English";
+  return `Language: ${args.language} — write every human-readable field in ${languageName} only.
 Blocked topicKeys: ${JSON.stringify(args.blockedTopics)}
 Already asked questions: ${JSON.stringify(args.blockedQuestions)}
 LifeContext JSON:

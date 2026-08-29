@@ -170,6 +170,51 @@ Merges a new natural-language update into existing context. Does not erase previ
 
 ---
 
+## POST `/api/life-guardian`
+
+Proxies to the **LIFE GUARDIAN AI v2** n8n workflow, which runs its own conversational pipeline (AI extraction, risk map, simulations, action plan). Separate from `/api/analyze` — use whichever the frontend prefers.
+
+### Request
+
+```json
+{
+  "userId": "demo-user-001",
+  "message": "I am 42 with two children and a mortgage.",
+  "locale": "en-JP",
+  "currency": "JPY",
+  "inputMode": "text"
+}
+```
+
+### Success
+
+Returns the workflow's `LifeGuardianResponse` (see `lib/life-guardian/types.ts`): `conversation`, `lifeEvents`, `profile`, `riskMap`, `priorities`, `actionPlan`, `simulation`, `followUp`.
+
+### Workflow inactive or unreachable
+
+HTTP 503, but always in the same shape so the frontend never has to parse an n8n error:
+
+```json
+{
+  "success": false,
+  "error": "workflow_inactive",
+  "conversation": {
+    "message": "LIFE GUARDIAN is temporarily unavailable. Please try again shortly.",
+    "tone": "supportive"
+  },
+  "lifeEvents": [],
+  "riskMap": [],
+  "priorities": [],
+  "actionPlan": { "next7Days": [], "next30Days": [], "next3Years": [] }
+}
+```
+
+Error values: `invalid_json`, `missing_userId`, `empty_message`, `workflow_unreachable`, `workflow_inactive`, `invalid_workflow_response`.
+
+Requires `N8N_LIFE_GUARDIAN_WEBHOOK_URL` and a **published** v2 workflow.
+
+---
+
 ## POST `/api/follow-up`
 
 Forwards an engagement event to n8n. Core product must not depend on this succeeding.

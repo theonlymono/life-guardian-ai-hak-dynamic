@@ -40,7 +40,8 @@ See [docs/API.md](docs/API.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | POST | `/api/analyze` | Extract context + first action |
 | POST | `/api/complete-action` | Remember answer + next action |
 | POST | `/api/life-update` | Merge a new life update |
-| POST | `/api/follow-up` | n8n webhook |
+| POST | `/api/life-guardian` | Proxy to the LIFE GUARDIAN AI v2 n8n pipeline |
+| POST | `/api/follow-up` | n8n follow-up webhook |
 
 Frontend keeps `LifeContext` in client state and sends it back. No auth or database in this MVP.
 
@@ -65,15 +66,17 @@ Create `.env.local` (never commit real values):
 
 | Variable | Required for | Notes |
 |---|---|---|
-| `AI_API_KEY` | Live analysis | OpenAI-compatible key. On Netlify, AI Gateway can inject `OPENAI_API_KEY` instead. |
-| `AI_MODEL` | Optional | Default `gpt-4o-mini` |
-| `AI_BASE_URL` | Optional | Override for a gateway |
+| `GEMINI_API_KEY` | Live analysis | Google AI Studio key. The client then targets Gemini's OpenAI-compatible endpoint automatically. |
+| `GEMINI_MODEL` | Optional | Default `gemini-3.5-flash-lite` |
+| `GEMINI_TEMPERATURE` | Optional | Default `0.2`. Keep it low — extraction must not invent facts. |
+| `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | Optional | Override to use another OpenAI-compatible provider or Netlify AI Gateway |
+| `N8N_LIFE_GUARDIAN_WEBHOOK_URL` | v2 pipeline | Workflow stays optional |
 | `N8N_WEBHOOK_URL` | Follow-up | Workflow stays optional |
 | `DEMO_BACKUP_MODE` | Demo safety | `true` enables a labeled deterministic backup. Responses include `"source": "demo_backup"`. |
 
-**Provide at minimum:** `AI_API_KEY` (or deploy on Netlify with AI Gateway enabled after the first production deploy).
+**Provide at minimum:** `GEMINI_API_KEY`.
 
-For follow-up: `N8N_WEBHOOK_URL`.
+For n8n: `N8N_LIFE_GUARDIAN_WEBHOOK_URL` and `N8N_WEBHOOK_URL`, both pointing at published workflows.
 
 ## Netlify
 
@@ -94,7 +97,7 @@ Set the same environment variables in the Netlify UI. Do not prefix secrets with
 | Wispr Flow | Voice-driven development, prompting, iteration, and documentation — not a production backend |
 | Mobbin | UX inspiration for information hierarchy and daily engagement patterns (frontend teammate) |
 | Netlify | Public web deployment |
-| OpenAI-compatible model | Natural-language extraction and personalized wording |
+| Google Gemini (`gemini-3.5-flash-lite`) | Natural-language extraction and personalized wording |
 
 ## Safety
 

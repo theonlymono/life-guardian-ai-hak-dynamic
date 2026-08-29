@@ -40,12 +40,19 @@ If `DEMO_BACKUP_MODE=true`, a clearly labeled deterministic sample path may run 
 
 ## Netlify
 
-Next.js App Router route handlers deploy as Netlify Functions via the Next runtime. Secrets stay in environment variables. Use `AI_API_KEY` locally, or Netlify AI Gateway after a production deploy.
+Next.js App Router route handlers deploy as Netlify Functions via the Next runtime. Secrets stay in environment variables. Set `GEMINI_API_KEY` in the Netlify UI; never prefix it with `NEXT_PUBLIC_`.
+
+## Output guards
+
+Gemini occasionally leaks CJK or Thai glyphs into Burmese output. `isCleanForLanguage` rejects those drafts and falls back to curated Burmese copy, so a language switch never produces mixed-script text.
+
+When extraction yields no usable facts, `hasEnoughContext` short-circuits to a single clarifying pressure question instead of letting the model guess a topic.
 
 ## Tool roles
 
 - **Cursor** — backend engineering, prompts, tests, docs
-- **n8n** — follow-up orchestration, not the reasoning brain
+- **Google Gemini** — `gemini-3.5-flash-lite` for extraction and wording
+- **n8n** — LIFE GUARDIAN AI v2 pipeline plus follow-up orchestration
 - **Wispr Flow** — development productivity (voice prompting / iteration), not a production backend
 - **Mobbin** — UX inspiration used by the frontend teammate
 - **Netlify** — public web deployment
