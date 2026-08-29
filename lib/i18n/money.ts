@@ -39,6 +39,22 @@ export function toMyanmarDigits(text: string): string {
   return text.replace(/\d/g, (digit) => MYANMAR_DIGITS[Number(digit)]);
 }
 
+/**
+ * Reads what someone typed into a numeric field.
+ *
+ * Burmese numerals count as digits. Anything holding no digit at all comes
+ * back unchanged, because the alternative — an empty string parsing as 0 —
+ * answers "none" on the customer's behalf and then scores them on it.
+ */
+export function readTypedNumber(raw: string): number | string {
+  const trimmed = raw.trim();
+  const digits = myanmarDigitsToLatin(trimmed).replace(/[^0-9.-]/g, "");
+  if (digits === "") return trimmed;
+
+  const numeric = Number(digits);
+  return Number.isFinite(numeric) ? numeric : trimmed;
+}
+
 const UNIT_MULTIPLIERS: Record<string, number> = {
   သိန်း: 100_000,
   သန်း: 1_000_000,

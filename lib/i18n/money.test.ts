@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatMoney, parseMoney } from "./money";
+import { formatMoney, parseMoney, readTypedNumber } from "./money";
 
 test("reads kyat written the way Myanmar customers write it", () => {
   const cases: [string, number][] = [
@@ -59,4 +59,20 @@ test("round trips what the customer wrote", () => {
   const parsed = parseMoney("သိန်း ၈၀၀", "my");
   assert.ok(parsed);
   assert.equal(formatMoney(parsed.amount, parsed.currency, "my"), "၈၀၀ သိန်း");
+});
+
+test("Burmese numerals typed into a numeric field are read as numbers", () => {
+  assert.equal(readTypedNumber("၃"), 3);
+  assert.equal(readTypedNumber("၁၅၀"), 150);
+  assert.equal(readTypedNumber("၃၀၀,၀၀၀"), 300000);
+});
+
+test("Latin digits still work, with stray characters ignored", () => {
+  assert.equal(readTypedNumber(" 300000 "), 300000);
+  assert.equal(readTypedNumber("1,500"), 1500);
+});
+
+test("an answer with no digits is passed through, never turned into zero", () => {
+  assert.equal(readTypedNumber("မသေချာဘူး"), "မသေချာဘူး");
+  assert.equal(readTypedNumber("not sure"), "not sure");
 });
